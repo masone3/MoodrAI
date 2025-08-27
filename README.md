@@ -32,7 +32,7 @@ To run the AI Music Mood Classifier, you will need the following:
 
 ## Author
 
-- **Easton Mason**: *AI Music Mood Classifier* [https://www.linkedin.com/in/easton-mason/](https://adrress)
+- **Easton Mason**: *AI Music Mood Classifier* [https://www.linkedin.com/in/easton-mason/](https://www.linkedin.com/in/easton-mason/)
 
 ## Acknowledgments
 
