@@ -1,27 +1,47 @@
-# *Replace with YourProposedProposedProjectName*
+# *AI Music Mood Classifier*
 ## Description/Motivation
 
-Your formally written project proposal description, and why it is useful/interesting/fun goes here. Try to be as descriptive as possible, as we will be discussing your project ideas during the brainstorming in class.
+The AI Music Mood Classifier is a machine learning project that predicts the mood or genre of a given song by analyzing its audio features. The project extracts features such as Mel-frequency cepstral coefficients (MFCCs), chroma, tempo, and spectral contrast from audio files, then applies machine learning and deep learning models to classify the song’s mood (e.g., happy, sad, energetic, calm). 
+
+This project is both fun and useful:  
+- Fun because it allows listeners to explore music based on *how it feels* rather than just by artist or title.  
+- Useful because it could be extended into playlist generation, personalized recommendations, or music therapy applications.  
+- Interesting as a capstone because it combines signal processing, applied AI, user-facing software, and interpretability.  
+
+By the end of the semester, the system will provide a simple user interface where someone can upload an audio file and receive a predicted mood label.
 
 ### Prerequisites
+To run the AI Music Mood Classifier, you will need the following:  
+- Python 3.10+ (recommended, works with 3.13 if supported by libraries)  
+- An IDE such as VS Code, PyCharm, VS Studio
+- Required Python libraries:  
+  - `librosa` (audio feature extraction)  
+  - `numpy` and `pandas` (data handling)  
+  - `matplotlib` or `seaborn` (data visualization)  
+  - `scikit-learn` (baseline classifiers)  
+  - `pytorch` or `tensorflow` (for CNNs on spectrograms, optional stretch goal)  
+  - `streamlit` or `flask` (for the web UI)  
 
 What is likely to be needed to install and to run *YourProposedProjectName* go here. If nothing is required (i.e. it is a website), state so.
 
 ## Built With
 
-- [afreamework1](http://www.aframework1.io/): A framework that is likly to be used goes here.
-- [afreamework2](http://www.aframework2.io/): A second framework that is likly to be used goes here.
-- IDE, if applicable
+- [Librosa](https://librosa.org/): Python package for music and audio analysis.  
+- [Scikit-learn](https://scikit-learn.org/): ML library for baseline classification models.  
+- [PyTorch](https://pytorch.org/): Deep learning framework (for CNN spectrogram classifier).  
+- [Streamlit](https://streamlit.io/): Simple Python-based web app framework (for demo UI).  
+- VS Code: Primary IDE. 
 
 ## Author
 
-- **Your name**: *YourProposadProjectName* [yourLinkedIn or yourGithub profile](https://adrress)
+- **Easton Mason**: *YourProposadProjectName* [https://www.linkedin.com/in/easton-mason/](https://adrress)
 
 ## Acknowledgments
 
-- If you find code that you are going to use in YourProjectName, include author's name and URL here.
-- all who inspired the idea and/or the code in YourProjectName
-- other people you wish to acknowledge
+- [GTZAN Dataset](https://www.kaggle.com/datasets/carlthome/gtzan-genre-collection) for initial audio classification experiments.  
+- [EmoMusic Dataset](https://www.cp.jku.at/datasets/emoMusic/) for mood classification research.  
+- Tutorials and documentation from the Librosa, Scikit-learn, and PyTorch communities.
+- Doctor Wilborne and peers at Berea College who provided feedback and brainstorming support.  
 
 ## License (not required initially)
 
