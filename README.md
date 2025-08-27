@@ -22,8 +22,6 @@ To run the AI Music Mood Classifier, you will need the following:
   - `pytorch` or `tensorflow` (for CNNs on spectrograms, optional stretch goal)  
   - `streamlit` or `flask` (for the web UI)  
 
-What is likely to be needed to install and to run *YourProposedProjectName* go here. If nothing is required (i.e. it is a website), state so.
-
 ## Built With
 
 - [Librosa](https://librosa.org/): Python package for music and audio analysis.  
@@ -34,7 +32,7 @@ What is likely to be needed to install and to run *YourProposedProjectName* go h
 
 ## Author
 
-- **Easton Mason**: *YourProposadProjectName* [https://www.linkedin.com/in/easton-mason/](https://adrress)
+- **Easton Mason**: *AI Music Mood Classifier* [https://www.linkedin.com/in/easton-mason/](https://adrress)
 
 ## Acknowledgments
 
