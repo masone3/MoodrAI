@@ -10,6 +10,8 @@ This project is both fun and useful:
 
 By the end of the semester, the system will provide a simple user interface where someone can upload an audio file and receive a predicted mood label.
 
+For more information, here is the [concept link](concept.md).
+
 ### Prerequisites
 To run the AI Music Mood Classifier, you will need the following:  
 - Python 3.10+ (recommended, works with 3.13 if supported by libraries)  
