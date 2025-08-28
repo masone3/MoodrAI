@@ -1,4 +1,7 @@
-# *AI Music Mood Classifier*<sup>1</sup>
+# Concept Proposal: AI Music Mood Classifier
+
+## Project Name
+AI Music Mood Classifier
 
 ## Goals
 
