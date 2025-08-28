@@ -16,6 +16,12 @@ The primary goal of this project is to create an application capable of analyzin
 
 For more information, here is the [concept link](concept.md).
 
+## Scope
+The AI Music Mood Classifier will focus on analyzing audio files, extracting features, and classifying tracks into a small set of moods (e.g., happy, sad, calm, energetic). The system will include feature extraction, model training, and a simple graphical user interface (GUI) for user interaction. Out of scope are advanced features such as real-time mood classification of live audio, integration with third-party streaming services, and lyric-based sentiment analysis, which are reserved for possible future work.
+
+## Vision
+The vision of this project is to create an accessible AI tool that bridges music and emotion by automatically classifying songs into moods. When completed, the tool will provide users with a simple way to organize, understand, and interact with music emotionally—whether for personal listening, creative projects, or research. While compact in scope for this course, the system serves as a foundation for richer music-emotion applications in the future.
+
 ### Prerequisites
 To run the AI Music Mood Classifier, you will need the following:  
 - Python 3.10+ (recommended, works with 3.13 if supported by libraries)  
