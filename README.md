@@ -10,6 +10,10 @@ This project is both fun and useful:
 
 By the end of the semester, the system will provide a simple user interface where someone can upload an audio file and receive a predicted mood label.
 
+## Project Concept
+
+The primary goal of this project is to create an application capable of analyzing music tracks and classifying them into emotional or mood-based categories (e.g., happy, sad, energetic, calm). This classifier will use artificial intelligence techniques—specifically machine learning and audio signal processing—to understand the relationship between audio features and perceived emotions.  
+
 For more information, here is the [concept link](concept.md).
 
 ### Prerequisites
