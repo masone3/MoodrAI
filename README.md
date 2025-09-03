@@ -39,7 +39,7 @@ To run the AI Music Mood Classifier, you will need the following:
 - [Librosa](https://librosa.org/): Python package for music and audio analysis.  
 - [Scikit-learn](https://scikit-learn.org/): ML library for baseline classification models.  
 - [PyTorch](https://pytorch.org/): Deep learning framework (for CNN spectrogram classifier).  
-- [Streamlit](https://streamlit.io/): Simple Python-based web app framework (for demo UI).  
+- [TKinter](https://docs.python.org/3/library/tkinter.html/): Simple Python-based app GUI (for demo UI).  
 - VS Code: Primary IDE. 
 
 ## Author
@@ -49,7 +49,7 @@ To run the AI Music Mood Classifier, you will need the following:
 ## Acknowledgments
 
 - [GTZAN Dataset](https://www.kaggle.com/datasets/carlthome/gtzan-genre-collection) for initial audio classification experiments.  
-- [EmoMusic Dataset](https://www.cp.jku.at/datasets/emoMusic/) for mood classification research.  
+- [EmoMusic Dataset]([https://www.cp.jku.at/datasets/emoMusic/](https://cvml.unige.ch/databases/emoMusic/)) for mood classification research.  
 - Tutorials and documentation from the Librosa, Scikit-learn, and PyTorch communities.
 - Doctor Wilborne and peers at Berea College who provided feedback and brainstorming support.  
 
