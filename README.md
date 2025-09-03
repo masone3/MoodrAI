@@ -49,7 +49,7 @@ To run the AI Music Mood Classifier, you will need the following:
 ## Acknowledgments
 
 - [GTZAN Dataset](https://www.kaggle.com/datasets/carlthome/gtzan-genre-collection) for initial audio classification experiments.  
-- [EmoMusic Dataset]([https://www.cp.jku.at/datasets/emoMusic/](https://cvml.unige.ch/databases/emoMusic/)) for mood classification research.  
+- [EmoMusic Dataset](https://cvml.unige.ch/databases/emoMusic/) for mood classification research.  
 - Tutorials and documentation from the Librosa, Scikit-learn, and PyTorch communities.
 - Doctor Wilborne and peers at Berea College who provided feedback and brainstorming support.  
 
