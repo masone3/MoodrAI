@@ -33,6 +33,8 @@ To run the AI Music Mood Classifier, you will need the following:
   - `scikit-learn` (baseline classifiers)  
   - `pytorch` or `tensorflow` (for CNNs on spectrograms, optional stretch goal)  
   - `streamlit` or `flask` (for the web UI)  
+  - `seaborn` for the statistical graphing
+  - `Rainbow CSV` for reading the CSV files in a cohesive manner
 
 ## Built With
 
