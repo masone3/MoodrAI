@@ -1,11 +1,38 @@
-from codebase import data_loader, baseline_classifier
+"""
+main.py - Entry point for AI-Based Music Mood Classifier
+"""
 
-AUDIO_DIR = "datasets/DEAM/audio"
-ANNOTATIONS_CSV = "datasets/DEAM/static_annotations.csv"
+# Import project modules
+from codebase.data_loader import load_dataset
+from codebase.features import extract_features
+# from codebase.baseline_classifier import train_and_evaluate  # will be used in Week 3-4
+
+def main():
+    """
+    Main orchestration function.
+    - Loads annotations
+    - Extracts features
+    - Prepares dataset for ML
+    """
+    print("=== AI-Based Music Mood Classifier ===")
+
+    # Step 1: Load dataset (currently just test with small subset)
+    annotations_path = "data/DEAM/annotations.csv"
+    print("[INFO] Loading dataset...")
+    data = load_dataset(annotations_path, subset_size=10)  # just a small sample
+
+    # Step 2: Extract features for each audio file
+    print("[INFO] Extracting features...")
+    X, y = extract_features(data, 34000)
+
+    print(f"[INFO] Extracted features shape: {X.shape}")
+    print(f"[INFO] Labels shape: {y.shape}")
+
+    # Step 3: (Week 3-4) Train baseline model
+    # print("[INFO] Training baseline classifier...")
+    # train_and_evaluate(X, y)
+
+    print("[INFO] Pipeline check complete.")
 
 if __name__ == "__main__":
-    # Step 1: Load features
-    X, y = data_loader.load_deam_dataset_mfcc(AUDIO_DIR, ANNOTATIONS_CSV, n_samples=100)
-
-    # Step 2: Train baseline
-    clf, scaler = baseline_classifier.train_baseline(X, y)
+    main()
