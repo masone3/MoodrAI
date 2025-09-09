@@ -2,39 +2,33 @@
 main.py - Entry point for AI-Based Music Mood Classifier
 """
 
-# Import project modules
-from codebase.data_loader import load_deam_dataset_mfcc
+from codebase.data_loader import load_deam_annotations, get_audio_files
 from codebase.features import extract_features
-# from codebase.baseline_classifier import train_and_evaluate  # will be used in Week 3-4
 
 def main():
-    """
-    Main orchestration function.
-    - Loads annotations
-    - Extracts features
-    - Prepares dataset for ML
-    """
-    print("=== AI-Based Music Mood Classifier ===")
+    # Paths
+    audio_dir = "data/DEAM/audio"
 
-    subset_size = 10
+    # 1. Load annotations
+    print("Loading annotations...")
+    annotations_df = load_deam_annotations()
 
-    # Step 1: Load dataset (currently just test with small subset)
-    annotations_path = "data/DEAM/annotations.csv"
-    print("[INFO] Loading dataset...")
-    data = load_deam_dataset_mfcc("data/DEAM",annotations_path, subset_size)  # just a small sample
+    # 2. Match audio files to labels
+    print("Matching audio files...")
+    dataset = get_audio_files(audio_dir, annotations_df)
 
-    # Step 2: Extract features for each audio file
-    print("[INFO] Extracting features...")
-    X, y = extract_features(data, 34000)
+    # Debug: print first 3 matches
+    print(f"Found {len(dataset)} songs")
+    print("Sample:", dataset[:3])
 
-    print(f"[INFO] Extracted features shape: {X.shape}")
-    print(f"[INFO] Labels shape: {y.shape}")
-
-    # Step 3: (Week 3-4) Train baseline model
-    # print("[INFO] Training baseline classifier...")
-    # train_and_evaluate(X, y)
-
-    print("[INFO] Pipeline check complete.")
+    # 3. Extract features for first few tracks
+    print("\nExtracting features...")
+    for i, (audio_path, label) in enumerate(dataset[:3]):  # just test 3 tracks
+        features = extract_features(audio_path)
+        print(f"Track {i+1}: {audio_path}")
+        print("  Label (valence, arousal):", label)
+        print("  Features shape:", features.shape)
+        print("  Features sample:", features[:5], "\n")
 
 if __name__ == "__main__":
     main()
