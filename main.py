@@ -5,7 +5,6 @@ main.py - Entry point for AI-Based Music Mood Classifier
 from codebase.data_loader import load_deam_annotations, get_audio_files
 from codebase.features import extract_features
 import matplotlib.pyplot as plt
-import pandas as pd
 
 def main():
     # Paths
@@ -32,10 +31,7 @@ def main():
         print("  Features shape:", features.shape)
         print("  Features sample:", features[:5], "\n")
 
-    file1 = "data/DEAM/annotations.csv"
-    df = pd.read_csv(file1, sep=",")
-
-    plt.scatter(df["valence_mean"], df["arousal_mean"])
+    plt.scatter(annotations_df["valence_mean"], annotations_df["arousal_mean"])
     plt.xlabel("Valence")
     plt.ylabel("Arousal")
 
