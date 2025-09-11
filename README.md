@@ -29,19 +29,32 @@ To run the AI Music Mood Classifier, you will need the following:
 - Required Python libraries:  
   - `librosa` (audio feature extraction)  
   - `numpy` and `pandas` (data handling)  
-  - `matplotlib` or `seaborn` (data visualization)  
+  - `matplotlib` (data visualization)  
   - `scikit-learn` (baseline classifiers)  
-  - `pytorch` or `tensorflow` (for CNNs on spectrograms, optional stretch goal)  
-  - `streamlit` or `flask` (for the web UI)  
-  - `seaborn` for the statistical graphing
+  - `pytorch` (for CNNs on spectrograms, optional stretch goal)  
+  - `TKinter` (for the GUI)  
   - `Rainbow CSV` for reading the CSV files in a cohesive manner
+
+## Requirements
+
+The AI-Based Music Mood Classifier aims to analyze audio tracks and predict their emotional content (valence and arousal). This project supports students, researchers, and music enthusiasts by providing automated labeling of music moods, useful for playlists, studies, and music therapy.
+
+For more information on the requirements: [requirements link](requirements.md)
+
+## Design
+
+The system is organized into modular components for data loading, feature extraction, classification, and a simple GUI for user interaction. This separation ensures clarity, easier testing, and flexibility to extend the project with more advanced models in the future.
+
+For more information on the design: [design link](design.md)
 
 ## Built With
 
 - [Librosa](https://librosa.org/): Python package for music and audio analysis.  
 - [Scikit-learn](https://scikit-learn.org/): ML library for baseline classification models.  
 - [PyTorch](https://pytorch.org/): Deep learning framework (for CNN spectrogram classifier).  
-- [TKinter](https://docs.python.org/3/library/tkinter.html/): Simple Python-based app GUI (for demo UI).  
+- [TKinter](https://docs.python.org/3/library/tkinter.html/): Simple Python-based app GUI (for demo UI).
+- [Pandas](https://pandas.pydata.org/): Used for data handling, cleaning, and managing the annotation data.
+- [Numpy](https://numpy.org/) Also used for data handling, cleaning, and managing the annotation data.
 - VS Code: Primary IDE. 
 
 ## Author
@@ -50,8 +63,7 @@ To run the AI Music Mood Classifier, you will need the following:
 
 ## Acknowledgments
 
-- [GTZAN Dataset](https://www.kaggle.com/datasets/carlthome/gtzan-genre-collection) for initial audio classification experiments.  
-- [EmoMusic Dataset](https://cvml.unige.ch/databases/emoMusic/) for mood classification research.  
+- [DEAM Dataset](https://cvml.unige.ch/databases/DEAM/) for mood classification research and initial audio classification experiments.  
 - Tutorials and documentation from the Librosa, Scikit-learn, and PyTorch communities.
 - Doctor Wilborne and peers at Berea College who provided feedback and brainstorming support.  
 
