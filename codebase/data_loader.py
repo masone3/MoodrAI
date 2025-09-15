@@ -8,10 +8,9 @@ features like MFCCs or Mel-spectrograms.
 import os
 import pandas as pd
 
-def load_deam_annotations():
+def load_deam_annotations(file1):
     """Load static song-level DEAM annotations into a single DataFrame."""
-    file1 = "data/DEAM/annotations.csv"
-
+    
     df = pd.read_csv(file1, sep=",")
     return df
 
