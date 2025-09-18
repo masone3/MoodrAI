@@ -8,64 +8,66 @@ Includes Logistic Regression as a starting point.
 import pandas as pd
 import numpy as np
 
-from sklearn.linear_model import LogisticRegression
+from sklearn.model_selection import KFold, cross_val_score
+from sklearn.pipeline import Pipeline
+from sklearn.impute import SimpleImputer
 from sklearn.preprocessing import StandardScaler
-from sklearn.model_selection import train_test_split
+from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import accuracy_score
 
 
-def train_logistic_regression(df: pd.DataFrame, label_col: str, test_size=0.2, random_state=42):
+def train_logistic_regression(dataset: pd.DataFrame, label_col: str, n_splits=5, random_state=42):
     """
-    Trains a logistic regression classifier on extracted features.
-    
+    Trains and evaluates a logistic regression classifier with k-fold cross-validation.
+
     Args:
-        df: DataFrame containing features + labels
+        dataset: DataFrame containing features + labels
         label_col: column name of the binary target label
-        test_size: proportion of dataset used for testing
+        n_splits: number of folds for cross-validation
         random_state: reproducibility
-    
+
     Returns:
-        model, scaler, df with predictions
+        model, scaler, dataset with predictions
     """
-    # Select feature columns (adjust if you add more)
-    feature_cols = ['mfcc_0', 'mfcc_1', 'mfcc_2', 'mfcc_3', 'mfcc_4', 'mfcc_5', 'mfcc_6', 'mfcc_7', 'mfcc_8', 'mfcc_9', 'mfcc_10', 'mfcc_11', 'mfcc_12', 'mfcc_13', 'mfcc_14', 'mfcc_15', 'mfcc_16', 'mfcc_17', 'mfcc_18', 'mfcc_19', 'chroma_0', 'chroma_1', 'chroma_2', 'chroma_3', 'chroma_4', 'chroma_5', 'chroma_6', 'chroma_7', 'chroma_8', 'chroma_9', 'chroma_10', 'chroma_11', 'contrast_0', 'contrast_1', 'contrast_2', 'contrast_3', 'contrast_4', 'contrast_5', 'contrast_6', 'centroid', 'bandwidth', 'rolloff', 'zcr', 'tempo', 'song_id', 'valence_mean', 'arousal_mean']
 
-    # Expand vector features into separate columns
-    expanded = []
-    for idx, row in df.iterrows():
-        row_feats = {}
-        for col in feature_cols:
-            val = row[col]
-            if isinstance(val, np.ndarray):  # expand vectors
-                for i, v in enumerate(val):
-                    row_feats[f"{col}_{i}"] = v
-            else:  # keep scalar as is
-                row_feats[col] = val
-        expanded.append(row_feats)
+    # Define the feature columns (exclude non-numeric / label cols)
+    feature_cols = [
+        col for col in dataset.columns
+        if col not in [
+            "song_id", "filename",
+            "valence_mean", "arousal_mean",
+            "valence_label", "arousal_label"
+        ]
+    ]
 
-    X = pd.DataFrame(expanded)
-    y = df[label_col]
+    # Copy dataset to avoid modifying in place
+    dataset = dataset.copy()
 
-    # Train/test split
-    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=test_size, random_state=random_state)
+    X = dataset[feature_cols]
+    y = dataset[label_col]
 
-    # Scale features
-    scaler = StandardScaler()
-    X_train_scaled = scaler.fit_transform(X_train)
-    X_test_scaled = scaler.transform(X_test)
+    # Build pipeline (imputer -> scaler -> logistic regression)
+    pipeline = Pipeline([
+        ("imputer", SimpleImputer(strategy="mean")),
+        ("scaler", StandardScaler()),
+        ("logreg", LogisticRegression(max_iter=1000, random_state=random_state))
+    ])
 
-    # Train model
-    model = LogisticRegression(max_iter=1000)
-    model.fit(X_train_scaled, y_train)
+    # K-Fold cross-validation
+    kf = KFold(n_splits=n_splits, shuffle=True, random_state=random_state)
+    cv_scores = cross_val_score(pipeline, X, y, cv=kf, scoring="accuracy")
 
-    # Predictions
-    y_pred = model.predict(X_test_scaled)
+    print(f"🔎 {label_col} Logistic Regression CV Accuracy: "
+          f"{cv_scores.mean():.3f} ± {cv_scores.std():.3f}")
 
-    # Evaluate
-    acc = accuracy_score(y_test, y_pred)
-    print(f"{label_col} Logistic Regression Accuracy: {acc:.2f}")
+    # Train final model on full dataset
+    pipeline.fit(X, y)
 
-    # Save predictions back into DataFrame (only for test set for now)
-    df.loc[X_test.index, f"{label_col}_pred"] = y_pred
+    # Add predictions back into dataset
+    dataset[f"{label_col.replace('_label','')}_pred"] = pipeline.predict(X)
 
-    return model, scaler, df
+    # Extract model + scaler separately for return (useful later)
+    model = pipeline.named_steps["logreg"]
+    scaler = pipeline.named_steps["scaler"]
+
+    return model, scaler, dataset
