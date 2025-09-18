@@ -13,20 +13,19 @@ from codebase.baseline_classifier import train_logistic_regression
 
 def main():
     # -------------------------------------------------------------------
-    # Step 1. Load annotations (valence, arousal, etc.)
+    # Step 1. Load annotations + add labels
     # -------------------------------------------------------------------
     annotations_csv = "data/DEAM/processed_annotations.csv"
     annotations = load_deam_annotations(annotations_csv)
 
-    # Add binary labels (valence: high vs low, arousal: high vs low)
-    annotations = add_binary_labels(annotations)
+    df_labels = add_binary_labels(annotations)
 
-    print(f"✅ Loaded {len(annotations)} annotations with labels")
-    print(annotations[["song_id", "valence_mean", "valence_label", 
-                       "arousal_mean", "arousal_label"]].head())
+    print(f"✅ Loaded {len(df_labels)} annotations with labels")
+    print(df_labels[["song_id", "valence_mean", "valence_label",
+                     "arousal_mean", "arousal_label"]].head())
 
     # -------------------------------------------------------------------
-    # Step 2. Extract features for each audio file
+    # Step 2. Extract or load cached features
     # -------------------------------------------------------------------
     features_out = "data/DEAM/features.csv"
 
@@ -36,15 +35,13 @@ def main():
     else:
         print("⏳ Extracting features (first run)...")
         features_list = []
-        for _, row in annotations.iterrows():
+        for _, row in df_labels.iterrows():
             track_id = row["song_id"]
             audio_path = f"data/DEAM/audio/{track_id}.mp3"
 
             try:
                 feats = extract_features(audio_path)
                 feats["song_id"] = track_id
-                feats["valence_mean"] = row["valence_mean"]
-                feats["arousal_mean"] = row["arousal_mean"]
                 features_list.append(feats)
                 print(f"✅ Extracted features for track {track_id}")
             except Exception as e:
@@ -55,35 +52,42 @@ def main():
         print(f"✅ Saved extracted features to {features_out}")
 
     # -------------------------------------------------------------------
-    # Step 3. Visualization
+    # Step 3. Visualization (Valence vs Arousal)
     # -------------------------------------------------------------------
-    if "valence_mean" in df_features and "arousal_mean" in df_features:
-        plt.scatter(df_features["valence_mean"], df_features["arousal_mean"])
-        plt.xlabel("Valence")
-        plt.ylabel("Arousal")
-        plt.title("DEAM Dataset: Valence vs Arousal")
-        plt.show()
-    else:
-        print("⚠️ Skipping visualization (valence/arousal not found in features DataFrame).")
+    plt.scatter(df_labels["valence_mean"], df_labels["arousal_mean"])
+    plt.xlabel("Valence")
+    plt.ylabel("Arousal")
+    plt.title("DEAM Dataset: Valence vs Arousal")
+    plt.show()
 
     # -------------------------------------------------------------------
-    # Step 4. Merge features with annotations for training
+    # Step 4. Merge features with labels
     # -------------------------------------------------------------------
-    #dataset = pd.merge(df_features, annotations, on="song_id", how="inner")
-    dataset = pd.merge(df_features, annotations, on="song_id")
+    dataset = pd.merge(df_features, df_labels, on="song_id")
 
-    print(f"✅ Merged dataset shape: {dataset.shape}")
+    print("\n✅ Merged dataset with features + labels:")
+    print(dataset.head())
+
+    # Resolve duplicate valence/arousal columns after merge
+    if "valence_mean_x" in dataset.columns and "valence_mean_y" in dataset.columns:
+        # keep the labels version (_y) and drop the features version (_x)
+        dataset = dataset.drop(columns=["valence_mean_x", "arousal_mean_x"])
+        dataset = dataset.rename(columns={
+            "valence_mean_y": "valence_mean",
+            "arousal_mean_y": "arousal_mean"
+        })
 
     # -------------------------------------------------------------------
-    # Step 5. Train baseline models
+    # Step 5. Train classifiers
     # -------------------------------------------------------------------
-    
+
     # Train on valence
-    valence_model, scaler, dataset = train_logistic_regression(dataset, "valence_label")
+    valence_model, valence_scaler, dataset = train_logistic_regression(dataset, "valence_label")
 
     # Train on arousal
-    arousal_model, scaler, dataset = train_logistic_regression(dataset, "arousal_label")
+    arousal_model, arousal_scaler, dataset = train_logistic_regression(dataset, "arousal_label")
 
+    # Show predictions vs ground truth
     print(dataset[["valence_label", "valence_pred", "arousal_label", "arousal_pred"]].head())
 
 
