@@ -1,4 +1,4 @@
-# *🎵AI Music Mood Classifier?*
+# *🎵AI Music Mood Classifier*
 ## Description/Motivation
 
 The AI Music Mood Classifier is a machine learning project that predicts the mood or genre of a given song by analyzing its audio features. The project extracts features such as Mel-frequency cepstral coefficients (MFCCs), chroma, tempo, and spectral contrast from audio files, then applies machine learning and deep learning models to classify the song’s mood (e.g., happy, sad, energetic, calm). 
