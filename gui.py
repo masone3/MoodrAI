@@ -11,14 +11,27 @@ import tkinter as tk
 from tkinter import filedialog, messagebox
 import pandas as pd
 import os
+import pickle
 
 from codebase.features import extract_features
 from codebase.baseline_classifier import train_logistic_regression
 from codebase.data_loader import load_deam_annotations, add_binary_labels
+from sklearn.preprocessing import StandardScaler
+from sklearn.linear_model import LogisticRegression
 
 
 class MusicMoodGUI:
     def __init__(self, root):
+        with open("valence_model.pkl", "rb") as f:
+            self.valence_model: LogisticRegression = pickle.load(f)
+        with open("valence_scaler.pkl", "rb") as f:
+            self.valence_scaler: StandardScaler = pickle.load(f)
+
+        with open("arousal_model.pkl", "rb") as f:
+            self.arousal_model: LogisticRegression = pickle.load(f) 
+        with open("arousal_scaler.pkl", "rb") as f:
+            self.arousal_scaler: StandardScaler = pickle.load(f)
+
         self.root = root
         self.root.title("Music Mood Classifier (Demo)")
         self.root.geometry("400x300")

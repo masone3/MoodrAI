@@ -5,6 +5,7 @@ main.py - Entry point for AI-Based Music Mood Classifier
 import os
 import matplotlib.pyplot as plt
 import pandas as pd
+import pickle
 
 from codebase.data_loader import load_deam_annotations, add_binary_labels
 from codebase.features import extract_features
@@ -89,6 +90,15 @@ def main():
 
     # Show predictions vs ground truth
     print(dataset[["valence_label", "valence_pred", "arousal_label", "arousal_pred"]].head())
+
+    with open("valence_model.pkl", "wb") as f:
+        pickle.dump(valence_model, f)
+    with open("valence_scaler.pkl", "wb") as f:
+        pickle.dump(valence_scaler, f)
+    with open("arousal_model.pkl", "wb") as f:
+        pickle.dump(arousal_model, f)
+    with open("arousal_scaler.pkl", "wb") as f:
+        pickle.dump(arousal_scaler, f)
 
 
 if __name__ == "__main__":
