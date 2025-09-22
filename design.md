@@ -1,28 +1,37 @@
-# 🏗️ Software Design Document (Preliminary)
+# 🏗️ Software Design Document (Detailed)
 
 **Project Title:** AI-Based Music Mood Classifier  
 **Author:** Easton Mason  
-**Date:** 2025-09-11  
+**Date:** 2025-09-17  
 
 ---
 
 ## 1. Introduction
+This document describes the **software architecture** of the AI-Based Music Mood Classifier.  
+The project follows a **modular design** so that each component is independent, testable, and easily extendable.  
 
-This document describes the **architectural design** of the AI-Based Music Mood Classifier. The goal is to define the **major components**, their responsibilities, and the flow of data and control between them.  
-
-The system will follow a **modular architecture** to ensure clarity, maintainability, and extensibility. Each module is designed to handle a specific responsibility, and together they form the end-to-end music mood classification pipeline.
+Goals of this design:
+- Enable clear data flow from audio → features → model → predictions.  
+- Support baseline models now, but leave room for advanced models later.  
+- Provide a minimal GUI to demonstrate predictions in real-time.  
 
 ---
 
 ## 2. High-Level Architecture
 
 ### 2.1 System Overview
-The classifier system consists of five main layers:
-1. **Data Layer** – Handles dataset loading and annotation parsing.
-2. **Feature Extraction Layer** – Extracts audio features (MFCCs, tempo, spectral data).
-3. **Model Layer** – Provides machine learning models for classification and evaluation.
-4. **Presentation Layer** – Minimal GUI for file input and displaying predictions.
-5. **Utilities Layer** – Common helper functions, logging, and visualization.
+The classifier system consists of **five layers**:
+
+1. **Data Layer** – Loads and structures the DEAM dataset.  
+2. **Feature Extraction Layer** – Extracts features (MFCCs, chroma, spectral descriptors, tempo).  
+3. **Model Layer** – Provides training and evaluation (Logistic Regression baseline, Random Forest next, CNN stretch).  
+4. **Presentation Layer** – Tkinter GUI for interactive predictions.  
+5. **Utilities Layer** – Visualization, logging, caching, model persistence.  
+
+### 2.2 Design Rationale
+- **Modularity** ensures that, for example, `features.py` can be improved independently without breaking the GUI.  
+- **Baseline-first modeling** (Logistic Regression) provides interpretability before moving to Random Forest.  
+- **Tkinter GUI** is lightweight, included in Python by default, and sufficient for demo purposes.  
 
 ---
 
@@ -30,82 +39,83 @@ The classifier system consists of five main layers:
 
 ### 3.1 Data Loader (`data_loader.py`)
 - **Responsibilities:**  
-  - Load DEAM dataset audio files and corresponding annotations.  
-  - Provide structured data (pandas DataFrame) for feature extraction.  
-- **Inputs:** File paths, annotation CSVs.  
-- **Outputs:** Audio signals, labels (valence/arousal).  
+  - Load DEAM dataset annotations into a DataFrame.  
+  - Provide binary labels (`valence_label`, `arousal_label`).  
+- **Inputs:** `processed_annotations.csv`.  
+- **Outputs:** `pandas.DataFrame` with song_id, valence/arousal means, binary labels.  
+- **Planned Functions:**  
+  - `load_deam_annotations(path)`  
+  - `add_binary_labels(df)`  
 
 ### 3.2 Feature Extraction (`features.py`)
 - **Responsibilities:**  
-  - Use `librosa` to extract features such as MFCCs, chroma, spectral contrast.  
-  - Standardize features for training.  
-- **Inputs:** Raw audio signals from `data_loader`.  
-- **Outputs:** Feature vectors for each track.  
+  - Use `librosa` to compute audio features.  
+  - Save features to `features.csv` for reuse.  
+- **Inputs:** `.mp3` or `.wav` file path.  
+- **Outputs:** `dict` → converted to DataFrame row (e.g., `mfcc_0..19`, `chroma_0..11`, `tempo`).  
+- **Planned Functions:**  
+  - `extract_features(audio_path)`  
 
 ### 3.3 Baseline Classifier (`baseline_classifier.py`)
 - **Responsibilities:**  
-  - Train a baseline model (Logistic Regression, SVM).  
-  - Evaluate predictions against ground-truth labels.  
-- **Inputs:** Features and labels.  
-- **Outputs:** Predictions, evaluation metrics.  
+  - Train Logistic Regression and evaluate with accuracy & cross-validation.  
+  - Save trained model + scaler via `pickle`.  
+- **Inputs:** Features DataFrame, binary labels.  
+- **Outputs:** Model object, predictions, metrics.  
+- **Planned Functions:**  
+  - `train_logistic_regression(dataset, label_col)`  
 
-### 3.4 Advanced Model (`model.py`) *(Stretch Goal)*  
+### 3.4 Advanced Model (`model.py`) *(Stretch Goal)*
 - **Responsibilities:**  
-  - Implement CNN for spectrogram-based classification using PyTorch.  
-- **Inputs:** Spectrogram images or feature matrices.  
-- **Outputs:** Predicted mood categories.  
+  - Implement CNN for spectrograms.  
+- **Inputs:** Mel spectrogram tensors.  
+- **Outputs:** Predicted mood classes.  
 
-### 3.5 GUI (`gui.py`)  
+### 3.5 GUI (`gui.py`)
 - **Responsibilities:**  
-  - Provide a simple Tkinter-based interface.  
-  - Allow user to upload a song.  
-  - Display predicted mood label.  
-- **Inputs:** Audio file path.  
-- **Outputs:** Mood label visualization.  
+  - Provide simple Tkinter GUI.  
+  - Let user upload an audio file and see predictions.  
+- **Inputs:** User-selected `.mp3`/`.wav` file.  
+- **Outputs:** Valence/arousal predictions displayed as labels (later: plots).  
+- **Planned Functions:**  
+  - `predict_mood(audio_path)`  
+  - `run_gui()`  
 
-### 3.6 Utilities & Visualization (`utils.py`)  
+### 3.6 Utilities (`utils.py`)
 - **Responsibilities:**  
-  - Feature/mood scatterplots.  
-  - Model saving/loading functions.  
-  - Logging.  
+  - Generate scatterplots of valence/arousal.  
+  - Save/load models.  
+  - Handle logging and errors.  
+- **Planned Functions:**  
+  - `plot_valence_arousal(df)`  
+  - `save_model(model, scaler, path)`  
+  - `load_model(path)`  
 
 ---
 
 ## 4. Control Flow
 
-1. **User launches app** → GUI starts.  
-2. **Dataset Preparation** → `data_loader` loads audio + labels.  
-3. **Feature Extraction** → `features` processes audio.  
-4. **Model Training** → `baseline_classifier` trains model.  
-5. **Prediction** → New audio uploaded → features extracted → prediction generated → GUI displays mood.  
+1. **Startup:** User launches app via `main.py` or `gui.py`.  
+2. **Dataset Prep:** `data_loader` loads annotations, adds binary labels.  
+3. **Feature Extraction:** `features` extracts or loads from cache (`features.csv`).  
+4. **Training:** `baseline_classifier` trains Logistic Regression, saves models.  
+5. **Prediction:**  
+   - From dataset → Evaluate with CV.  
+   - From GUI → Extract features, scale, predict.  
 
 ---
 
-## 5. Data Flow Diagram (Simplified)
-
-Audio Files + Annotations
-↓
-data_loader.py
-↓
-features.py
-↓
-baseline_classifier.py → utils.py (evaluation, save/load)
-↓
-gui.py (Display Prediction)
-
-
----
-
-## 6. Preliminary Class & Module Outline
+## 5. Data Flow Diagram (Detailed)
 
 ```plaintext
-project_root/
-│
-├── main.py              # Entry point, coordinates all modules
-│
-└──  codebase/            # Core implementation modules
-    ├── data_loader.py   # Handles dataset loading
-    ├── features.py      # Extracts audio features
-    ├── baseline_classifier.py  # Trains/tests baseline ML models
-    ├── gui.py           # (Later) Simple Tkinter GUI
-    └── utils.py         # Optional helpers (file paths, plotting, etc.)
+Audio Files + Annotations
+        ↓
+ data_loader.py → (DataFrame: song_id, valence/arousal)
+        ↓
+ features.py → (features.csv: mfcc_*, chroma_*, tempo, etc.)
+        ↓
+ baseline_classifier.py → (train + evaluate Logistic Regression)
+        ↓
+ utils.py → (save model, plot scatter)
+        ↓
+ gui.py → (interactive predictions)
