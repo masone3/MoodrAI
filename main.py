@@ -23,7 +23,7 @@ def main():
 
     print(f"✅ Loaded {len(df_labels)} annotations with labels")
     print(df_labels[["song_id", "valence_mean", "valence_label",
-                     "arousal_mean", "arousal_label"]].head())
+                     "arousal_mean", "arousal_label"]])
 
     # -------------------------------------------------------------------
     # Step 2. Extract or load cached features
@@ -67,7 +67,7 @@ def main():
     dataset = pd.merge(df_features, df_labels, on="song_id")
 
     print("\n✅ Merged dataset with features + labels:")
-    print(dataset.head())
+    print(dataset)
 
     # Resolve duplicate valence/arousal columns after merge
     if "valence_mean_x" in dataset.columns and "valence_mean_y" in dataset.columns:
@@ -82,14 +82,18 @@ def main():
     # Step 5. Train classifiers
     # -------------------------------------------------------------------
 
+    print(f"Dataset shape before training: {dataset.shape}")
+
+    plottedgraphs = "data/images"
+
     # Train on valence
-    valence_model, valence_scaler, dataset = train_logistic_regression(dataset, "valence_label")
+    valence_model, valence_scaler, dataset = train_logistic_regression(dataset, "valence_label", visualize=False, save_plots_dir=plottedgraphs)
 
     # Train on arousal
-    arousal_model, arousal_scaler, dataset = train_logistic_regression(dataset, "arousal_label")
+    arousal_model, arousal_scaler, dataset = train_logistic_regression(dataset, "arousal_label",visualize=True, save_plots_dir=plottedgraphs)
 
     # Show predictions vs ground truth
-    print(dataset[["valence_label", "valence_pred", "arousal_label", "arousal_pred"]].head())
+    print(dataset[["valence_label", "valence_pred", "arousal_label", "arousal_pred"]])
 
     with open("valence_model.pkl", "wb") as f:
         pickle.dump(valence_model, f)
