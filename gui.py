@@ -14,7 +14,7 @@ import os
 import pickle
 
 from codebase.features import extract_features
-from codebase.baseline_classifier import train_logistic_regression
+from codebase.baseline_classifier import train_baseline_model
 from codebase.data_loader import load_deam_annotations, add_binary_labels
 from sklearn.preprocessing import StandardScaler
 from sklearn.linear_model import LogisticRegression
@@ -78,8 +78,8 @@ class MusicMoodGUI:
             dataset = pd.merge(df_features, dataset, on="song_id")
 
             # Train models
-            self.valence_model, self.scaler, dataset = train_logistic_regression(dataset, "valence_label")
-            self.arousal_model, _, dataset = train_logistic_regression(dataset, "arousal_label")
+            self.valence_model, self.scaler, dataset = train_baseline_model(dataset, "valence_label")
+            self.arousal_model, _, dataset = train_baseline_model(dataset, "arousal_label")
 
             # Save feature columns for predictions
             self.feature_cols = [

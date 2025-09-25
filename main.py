@@ -9,7 +9,7 @@ import pickle
 
 from codebase.data_loader import load_deam_annotations, add_binary_labels
 from codebase.features import extract_features
-from codebase.baseline_classifier import train_logistic_regression
+from codebase.baseline_classifier import train_baseline_model
 
 
 def main():
@@ -87,22 +87,51 @@ def main():
     plottedgraphs = "data/images"
 
     # Train on valence
-    valence_model, valence_scaler, dataset = train_logistic_regression(dataset, "valence_label", visualize=False, save_plots_dir=plottedgraphs)
+    valence_logreg, valence_logreg_scaler, dataset = train_baseline_model(dataset, "valence_label", model_type="logreg", visualize=False, save_plots_dir=plottedgraphs)
 
     # Train on arousal
-    arousal_model, arousal_scaler, dataset = train_logistic_regression(dataset, "arousal_label",visualize=True, save_plots_dir=plottedgraphs)
+    arousal_logreg, arousal_logreg_scaler, dataset = train_baseline_model(dataset, "arousal_label", model_type="logreg", visualize=False, save_plots_dir=plottedgraphs)
+
+
+    # Train on valence
+    valence_svm, valence_svm_scaler, dataset = train_baseline_model(dataset, "valence_label", model_type="svm", visualize=False, save_plots_dir=plottedgraphs)
+
+    # Train on arousal
+    arousal_svm, arousal_svm_scaler, dataset = train_baseline_model(dataset, "arousal_label", model_type="svm", visualize=False, save_plots_dir=plottedgraphs)
+
+
+    # Train on valence
+    valence_rf, _, dataset = train_baseline_model(dataset, "valence_label", model_type="randomforest", visualize=False, save_plots_dir=plottedgraphs)
+
+    # Train on arousal
+    arousal_rf, _, dataset = train_baseline_model(dataset, "arousal_label", model_type="randomforest", visualize=False, save_plots_dir=plottedgraphs)
+    
 
     # Show predictions vs ground truth
     print(dataset[["valence_label", "valence_pred", "arousal_label", "arousal_pred"]])
 
     with open("valence_model.pkl", "wb") as f:
-        pickle.dump(valence_model, f)
+        pickle.dump(valence_logreg, f)
     with open("valence_scaler.pkl", "wb") as f:
-        pickle.dump(valence_scaler, f)
+        pickle.dump(valence_logreg_scaler, f)
     with open("arousal_model.pkl", "wb") as f:
-        pickle.dump(arousal_model, f)
+        pickle.dump(arousal_logreg, f)
     with open("arousal_scaler.pkl", "wb") as f:
-        pickle.dump(arousal_scaler, f)
+        pickle.dump(arousal_logreg_scaler, f)
+
+    with open("valence_model.pkl", "wb") as f:
+        pickle.dump(valence_svm, f)
+    with open("valence_scaler.pkl", "wb") as f:
+        pickle.dump(valence_svm_scaler, f)
+    with open("arousal_model.pkl", "wb") as f:
+        pickle.dump(arousal_svm, f)
+    with open("arousal_scaler.pkl", "wb") as f:
+        pickle.dump(arousal_svm_scaler, f)
+
+    with open("valence_model.pkl", "wb") as f:
+        pickle.dump(valence_rf, f)
+    with open("arousal_model.pkl", "wb") as f:
+        pickle.dump(arousal_rf, f)
 
 
 if __name__ == "__main__":
