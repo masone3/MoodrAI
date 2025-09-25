@@ -15,28 +15,31 @@ from sklearn.pipeline import Pipeline
 from sklearn.impute import SimpleImputer
 from sklearn.preprocessing import StandardScaler
 from sklearn.linear_model import LogisticRegression
+from sklearn.svm import SVC
+from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import accuracy_score, ConfusionMatrixDisplay
 
 
-def train_logistic_regression(
+def train_baseline_model(
     dataset: pd.DataFrame, 
     label_col: str, 
+    model_type: str = "logreg",   # "logreg" or "svm",
     n_splits=5, 
     random_state=42, 
     visualize=True,
     save_plots_dir=None
 ):
     """
-    Trains and evaluates a logistic regression classifier with k-fold cross-validation,
-    and optionally generates feature importance + evaluation visualizations.
+    Trains and evaluates a baseline model (Logistic Regression or SVM) with k-fold cross-validation.
 
     Args:
         dataset: DataFrame containing features + labels
         label_col: column name of the binary target label
+        model_type: "logreg" for Logistic Regression, "svm" for Support Vector Machine, "randomforest" for Random Forest Classifier
         n_splits: number of folds for cross-validation
         random_state: reproducibility
-        visualize: whether to show plots (default=True)
-        save_plots_dir: folder path to save plots (default=None means no saving)
+        visualize: whether to show/save evaluation plots
+        save_dir: optional directory path to save plots
 
     Returns:
         model, scaler, dataset with predictions
@@ -61,21 +64,41 @@ def train_logistic_regression(
     X = dataset[feature_cols]
     y = dataset[label_col]
 
+    # Choose model
+    if model_type == "logreg":
+        model = LogisticRegression(max_iter=1000, random_state=random_state)
+    elif model_type == "svm":
+        model = SVC(kernel="rbf", probability=True, random_state=random_state)
+    elif model_type == "randomforest":
+        model = RandomForestClassifier(
+            n_estimators=100,       # number of trees (default=100 is usually fine)
+            max_depth=None,         # allow trees to expand fully
+            random_state=random_state,
+            n_jobs=-1               # use all CPU cores
+        )
+    else:
+        raise ValueError(f"Unknown model_type: {model_type}")
+
     # Build pipeline (imputer -> scaler -> logistic regression)
     pipeline = Pipeline([
         ("imputer", SimpleImputer(strategy="mean")),
         ("scaler", StandardScaler()),
-        ("logreg", LogisticRegression(max_iter=1000, random_state=random_state))
+        ("clf", model)
     ])
 
     # K-Fold cross-validation
     kf = KFold(n_splits=n_splits, shuffle=True, random_state=random_state)
     cv_scores = cross_val_score(pipeline, X, y, cv=kf, scoring="accuracy")
 
-    print(f"🔎 {label_col} Logistic Regression CV Accuracy: "
+    print(f"🔎 {model_type.upper()} {label_col} CV Accuracy: "
           f"{cv_scores.mean():.3f} ± {cv_scores.std():.3f}")
-    
-    # Visualizing the information
+        
+    # Train final model on full dataset
+    pipeline.fit(X, y)
+
+    # Add predictions
+    dataset[f"{label_col.replace('_label','')}_pred"] = pipeline.predict(X)
+
     if visualize or save_plots_dir:
         # --- CV Accuracy per Fold ---
         plt.figure()
@@ -84,8 +107,11 @@ def train_logistic_regression(
         plt.xlabel("Fold")
         plt.ylabel("Accuracy")
         if save_plots_dir:
-            plt.savefig(os.path.join(save_plots_dir, f"{label_col}_cv_accuracy_folds.png"))
-        if visualize:
+            os.makedirs(save_plots_dir, exist_ok=True)
+            fname = f"{model_type}_{label_col}cv_accuracy_folds.png"
+            plt.savefig(os.path.join(save_plots_dir, fname))
+            plt.close()
+        elif visualize:
             plt.show()
         plt.close()
 
@@ -96,40 +122,54 @@ def train_logistic_regression(
         plt.xlabel("Accuracy")
         plt.ylabel("Frequency")
         if save_plots_dir:
-            plt.savefig(os.path.join(save_plots_dir, f"{label_col}_cv_accuracy_distribution.png"))
-        if visualize:
+            os.makedirs(save_plots_dir, exist_ok=True)
+            fname = f"{model_type}_{label_col}sv_accuracy_distribution.png"
+            plt.savefig(os.path.join(save_plots_dir, fname))
+            plt.close()
+        elif visualize:
             plt.show()
         plt.close()
 
-    # Train final model on full dataset
-    pipeline.fit(X, y)
-    dataset[f"{label_col.replace('_label','')}_pred"] = pipeline.predict(X)
-
-    if visualize or save_plots_dir:
         # --- Confusion Matrix ---
         y_pred = cross_val_predict(pipeline, X, y, cv=kf)
         disp = ConfusionMatrixDisplay.from_predictions(y, y_pred)
         plt.title(f"{label_col} Confusion Matrix (Cross-Val)")
         if save_plots_dir:
-            plt.savefig(os.path.join(save_plots_dir, f"{label_col}_confusion_matrix.png"))
-        if visualize:
+            os.makedirs(save_plots_dir, exist_ok=True)
+            fname = f"{model_type}_{label_col}confusion.png"
+            plt.savefig(os.path.join(save_plots_dir, fname))
+            plt.close()
+        elif visualize:
             plt.show()
         plt.close()
 
         # --- Feature Importance ---
-        model = pipeline.named_steps["logreg"]
+        # Extract trained components
+        trained_model = pipeline.named_steps["clf"]
         scaler = pipeline.named_steps["scaler"]
-        feature_importance = pd.Series(model.coef_[0], index=feature_cols)
-        top_features = feature_importance.abs().sort_values(ascending=False).head(15)
 
-        plt.figure()
-        top_features.plot(kind="barh")
-        plt.title(f"Top Features for {label_col} (LogReg Importance)")
-        plt.xlabel("Coefficient Magnitude")
-        if save_plots_dir:
-            plt.savefig(os.path.join(save_plots_dir, f"{label_col}_feature_importance.png"))
-        if visualize:
-            plt.show()
-        plt.close()
+        if model_type == "logreg":
+            feature_importance = pd.Series(trained_model.coef_[0], index=feature_cols)
+            top_features = feature_importance.abs().sort_values(ascending=False).head(15)
 
-    return model, scaler, dataset
+        elif model_type == "randomforest":
+            feature_importance = pd.Series(trained_model.feature_importances_, index=feature_cols)
+            top_features = feature_importance.sort_values(ascending=False).head(15)
+
+        else:
+            top_features = None  # SVM with RBF kernel doesn't provide feature importance
+
+        if top_features is not None:
+            plt.figure()
+            top_features.plot(kind="barh")
+            plt.title(f"Top Features for {label_col} ({model_type.upper()} Importance)")
+            plt.xlabel("Importance")
+            if save_plots_dir:
+                fname = f"{model_type}_{label_col}_feature_importance.png"
+                plt.savefig(os.path.join(save_plots_dir, fname))
+                plt.close()
+            elif visualize:
+                plt.show()
+            plt.close()
+
+    return trained_model, scaler, dataset
