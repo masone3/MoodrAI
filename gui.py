@@ -14,27 +14,18 @@ import os
 import pickle
 
 from codebase.features import extract_features
-from codebase.baseline_classifier import train_baseline_model
-from codebase.data_loader import load_deam_annotations, add_binary_labels
+
 from sklearn.preprocessing import StandardScaler
 from sklearn.linear_model import LogisticRegression
+import matplotlib.pyplot as plt
+from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 
 
 class MusicMoodGUI:
     def __init__(self, root):
-        with open("valence_model.pkl", "rb") as f:
-            self.valence_model: LogisticRegression = pickle.load(f)
-        with open("valence_scaler.pkl", "rb") as f:
-            self.valence_scaler: StandardScaler = pickle.load(f)
-
-        with open("arousal_model.pkl", "rb") as f:
-            self.arousal_model: LogisticRegression = pickle.load(f) 
-        with open("arousal_scaler.pkl", "rb") as f:
-            self.arousal_scaler: StandardScaler = pickle.load(f)
-
         self.root = root
-        self.root.title("Music Mood Classifier (Demo)")
-        self.root.geometry("400x300")
+        self.root.title("Music Mood Classifier")
+        self.root.geometry("600x600")
 
         # File selection
         self.file_label = tk.Label(root, text="No file selected")
@@ -48,47 +39,36 @@ class MusicMoodGUI:
         self.predict_btn.pack(pady=5)
 
         # Output
-        self.output_box = tk.Text(root, height=8, width=40)
+        self.output_box = tk.Text(root, height=10, width=45)
         self.output_box.pack(pady=10)
 
-        # Placeholder for trained models
-        self.valence_model = None
-        self.arousal_model = None
-        self.scaler = None
-        self.feature_cols = None
-
-        # Train models once when GUI starts
-        self.prepare_model()
-
-    def prepare_model(self):
-        """Train logistic regression models once on startup."""
+        # Load trained models + scalers
         try:
-            annotations_csv = "data/DEAM/processed_annotations.csv"
-            annotations = load_deam_annotations(annotations_csv)
-            dataset = add_binary_labels(annotations)
+            with open("valence_model.pkl", "rb") as f:
+                self.valence_model: LogisticRegression = pickle.load(f)
+            with open("valence_scaler.pkl", "rb") as f:
+                self.valence_scaler: StandardScaler = pickle.load(f)
+            with open("arousal_model.pkl", "rb") as f:
+                self.arousal_model: LogisticRegression = pickle.load(f)
+            with open("arousal_scaler.pkl", "rb") as f:
+                self.arousal_scaler: StandardScaler = pickle.load(f)
+        except Exception as e:
+            messagebox.showerror("Error", f"Could not load trained models: {e}")
+            return
 
-            # Load features (must exist already)
+        # Load feature list (ensure consistent with training)
+        try:
             features_csv = "data/DEAM/features.csv"
-            if not os.path.exists(features_csv):
-                messagebox.showerror("Error", "Features file not found. Run main.py first.")
-                return
             df_features = pd.read_csv(features_csv)
-
-            # Merge features + labels
-            dataset = pd.merge(df_features, dataset, on="song_id")
-
-            # Train models
-            self.valence_model, self.scaler, dataset = train_baseline_model(dataset, "valence_label")
-            self.arousal_model, _, dataset = train_baseline_model(dataset, "arousal_label")
-
-            # Save feature columns for predictions
             self.feature_cols = [
                 col for col in df_features.columns
-                if col not in ["song_id", "filename", "valence_mean", "arousal_mean"]
+                if col not in ["song_id", "valence_mean", "arousal_mean",
+                               "valence_label", "arousal_label"]
             ]
-
+            print(f"✅ GUI loaded {len(self.feature_cols)} training features")
         except Exception as e:
-            messagebox.showerror("Training Error", f"Could not prepare models: {e}")
+            messagebox.showerror("Error", f"Could not load feature columns: {e}")
+            self.feature_cols = None
 
     def select_file(self):
         """Open file dialog for audio file."""
@@ -103,27 +83,58 @@ class MusicMoodGUI:
         if not hasattr(self, "filepath"):
             messagebox.showwarning("Warning", "Please select a file first.")
             return
+        if self.feature_cols is None:
+            messagebox.showerror("Error", "Feature columns not available")
+            return
 
         try:
-            # Extract features
+            # Extract raw features
             feats = extract_features(self.filepath)
-
-            # Flatten dict to DataFrame
             df = pd.DataFrame([feats])
 
-            # Scale features
-            X = df[self.feature_cols]
-            X_scaled = self.scaler.transform(X)
+            # Sanity check: how many extracted?
+            extracted_count = df.shape[1]
 
-            # Predict
-            valence_pred = self.valence_model.predict(X_scaled)[0]
-            arousal_pred = self.arousal_model.predict(X_scaled)[0]
+            # Align with training columns (fill missing with 0)
+            df = df.reindex(columns=self.feature_cols, fill_value=0)
+            aligned_count = df.shape[1]
+
+            # Sanity check scalers
+            valence_expected = self.valence_scaler.n_features_in_
+            arousal_expected = self.arousal_scaler.n_features_in_
+
+            # Scale + Predict (valence)
+            X_scaled_val = self.valence_scaler.transform(df.values)
+            valence_pred = self.valence_model.predict(X_scaled_val)[0]
+
+            # Scale + Predict (arousal)
+            X_scaled_ar = self.arousal_scaler.transform(df.values)
+            arousal_pred = self.arousal_model.predict(X_scaled_ar)[0]
 
             # Show output
             self.output_box.delete("1.0", tk.END)
-            self.output_box.insert(tk.END, f"File: {os.path.basename(self.filepath)}\n")
+            self.output_box.insert(tk.END, f"File: {os.path.basename(self.filepath)}\n\n")
             self.output_box.insert(tk.END, f"Predicted Valence: {'High' if valence_pred else 'Low'}\n")
             self.output_box.insert(tk.END, f"Predicted Arousal: {'High' if arousal_pred else 'Low'}\n")
+
+            fig, ax = plt.subplots(figsize=(4, 4))
+            ax.axhline(0.5, color="gray", linestyle="--")  # horizontal midline
+            ax.axvline(0.5, color="gray", linestyle="--")  # vertical midline
+
+            # Plot the point (use 1 for High, 0 for Low)
+            ax.scatter(valence_pred, arousal_pred, color="red", s=100)
+
+            # Label axes
+            ax.set_xlabel("Valence (Low → High)")
+            ax.set_ylabel("Arousal (Low → High)")
+            ax.set_xticks([0, 1])
+            ax.set_yticks([0, 1])
+            ax.set_title("Valence–Arousal Prediction")
+
+            # Embed into Tkinter
+            canvas = FigureCanvasTkAgg(fig, master=self.root)
+            canvas.get_tk_widget().pack(pady=10)
+            canvas.draw()
 
         except Exception as e:
             messagebox.showerror("Prediction Error", f"Could not classify file: {e}")
