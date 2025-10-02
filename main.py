@@ -33,6 +33,8 @@ def main():
     if os.path.exists(features_out):
         print("🔄 Loading cached features...")
         df_features = pd.read_csv(features_out)
+        print("Feature columns:", df_features.columns.tolist())
+        print("Total:", len(df_features.columns))
     else:
         print("⏳ Extracting features (first run)...")
         features_list = []
@@ -67,49 +69,54 @@ def main():
     dataset = pd.merge(df_features, df_labels, on="song_id")
 
     print("\n✅ Merged dataset with features + labels:")
-    print(dataset)
+    print(dataset.head())
 
-    # Resolve duplicate valence/arousal columns after merge
-    if "valence_mean_x" in dataset.columns and "valence_mean_y" in dataset.columns:
-        # keep the labels version (_y) and drop the features version (_x)
-        dataset = dataset.drop(columns=["valence_mean_x", "arousal_mean_x"])
-        dataset = dataset.rename(columns={
-            "valence_mean_y": "valence_mean",
-            "arousal_mean_y": "arousal_mean"
-        })
+    # Explicitly define feature columns (exclude IDs, means, labels)
+    feature_cols = [
+        col for col in df_features.columns
+        if col not in ["song_id", "valence_mean", "arousal_mean",
+                       "valence_label", "arousal_label"]
+    ]
+    print(f"Using {len(feature_cols)} features for training")
 
     # -------------------------------------------------------------------
     # Step 5. Train classifiers
     # -------------------------------------------------------------------
-
-    print(f"Dataset shape before training: {dataset.shape}")
-
     plottedgraphs = "data/images"
 
-    # Train on valence
-    valence_logreg, valence_logreg_scaler, dataset = train_baseline_model(dataset, "valence_label", model_type="logreg", visualize=False, save_plots_dir=plottedgraphs)
+    # Logistic Regression
+    valence_logreg, valence_logreg_scaler, _ = train_baseline_model(
+        dataset[feature_cols + ["valence_label"]], "valence_label",
+        model_type="logreg", visualize=False, save_plots_dir=plottedgraphs
+    )
+    arousal_logreg, arousal_logreg_scaler, _ = train_baseline_model(
+        dataset[feature_cols + ["arousal_label"]], "arousal_label",
+        model_type="logreg", visualize=False, save_plots_dir=plottedgraphs
+    )
 
-    # Train on arousal
-    arousal_logreg, arousal_logreg_scaler, dataset = train_baseline_model(dataset, "arousal_label", model_type="logreg", visualize=False, save_plots_dir=plottedgraphs)
+    # SVM
+    valence_svm, valence_svm_scaler, _ = train_baseline_model(
+        dataset[feature_cols + ["valence_label"]], "valence_label",
+        model_type="svm", visualize=False, save_plots_dir=plottedgraphs
+    )
+    arousal_svm, arousal_svm_scaler, _ = train_baseline_model(
+        dataset[feature_cols + ["arousal_label"]], "arousal_label",
+        model_type="svm", visualize=False, save_plots_dir=plottedgraphs
+    )
 
+    # Random Forest
+    valence_rf, _, _ = train_baseline_model(
+        dataset[feature_cols + ["valence_label"]], "valence_label",
+        model_type="randomforest", visualize=False, save_plots_dir=plottedgraphs
+    )
+    arousal_rf, _, _ = train_baseline_model(
+        dataset[feature_cols + ["arousal_label"]], "arousal_label",
+        model_type="randomforest", visualize=False, save_plots_dir=plottedgraphs
+    )
 
-    # Train on valence
-    valence_svm, valence_svm_scaler, dataset = train_baseline_model(dataset, "valence_label", model_type="svm", visualize=False, save_plots_dir=plottedgraphs)
-
-    # Train on arousal
-    arousal_svm, arousal_svm_scaler, dataset = train_baseline_model(dataset, "arousal_label", model_type="svm", visualize=False, save_plots_dir=plottedgraphs)
-
-
-    # Train on valence
-    valence_rf, _, dataset = train_baseline_model(dataset, "valence_label", model_type="randomforest", visualize=False, save_plots_dir=plottedgraphs)
-
-    # Train on arousal
-    arousal_rf, _, dataset = train_baseline_model(dataset, "arousal_label", model_type="randomforest", visualize=False, save_plots_dir=plottedgraphs)
-    
-
-    # Show predictions vs ground truth
-    print(dataset[["valence_label", "valence_pred", "arousal_label", "arousal_pred"]])
-
+    # -------------------------------------------------------------------
+    # Step 6. Save models + scalers
+    # -------------------------------------------------------------------
     with open("valence_model.pkl", "wb") as f:
         pickle.dump(valence_logreg, f)
     with open("valence_scaler.pkl", "wb") as f:
@@ -119,19 +126,11 @@ def main():
     with open("arousal_scaler.pkl", "wb") as f:
         pickle.dump(arousal_logreg_scaler, f)
 
-    with open("valence_model.pkl", "wb") as f:
-        pickle.dump(valence_svm, f)
-    with open("valence_scaler.pkl", "wb") as f:
-        pickle.dump(valence_svm_scaler, f)
-    with open("arousal_model.pkl", "wb") as f:
-        pickle.dump(arousal_svm, f)
-    with open("arousal_scaler.pkl", "wb") as f:
-        pickle.dump(arousal_svm_scaler, f)
-
-    with open("valence_model.pkl", "wb") as f:
-        pickle.dump(valence_rf, f)
-    with open("arousal_model.pkl", "wb") as f:
-        pickle.dump(arousal_rf, f)
+    # Debug: Check feature counts
+    valence_scaler = pickle.load(open("valence_scaler.pkl", "rb"))
+    print("Scaler expects (valence):", valence_scaler.n_features_in_)
+    arousal_scaler = pickle.load(open("arousal_scaler.pkl", "rb"))
+    print("Scaler expects (arousal):", arousal_scaler.n_features_in_)
 
 
 if __name__ == "__main__":
