@@ -27,6 +27,9 @@ class MusicMoodGUI:
         self.root.title("Music Mood Classifier")
         self.root.geometry("600x600")
 
+        title_label = tk.Label(root, text="🎵 AI Music Mood Classifier 🎵", font=("Helvetica", 14, "bold"))
+        title_label.pack(pady=10)
+
         # File selection
         self.file_label = tk.Label(root, text="No file selected")
         self.file_label.pack(pady=10)
@@ -44,13 +47,13 @@ class MusicMoodGUI:
 
         # Load trained models + scalers
         try:
-            with open("valence_model.pkl", "rb") as f:
+            with open("models/valence_model.pkl", "rb") as f:
                 self.valence_model: LogisticRegression = pickle.load(f)
-            with open("valence_scaler.pkl", "rb") as f:
+            with open("models/valence_scaler.pkl", "rb") as f:
                 self.valence_scaler: StandardScaler = pickle.load(f)
-            with open("arousal_model.pkl", "rb") as f:
+            with open("models/arousal_model.pkl", "rb") as f:
                 self.arousal_model: LogisticRegression = pickle.load(f)
-            with open("arousal_scaler.pkl", "rb") as f:
+            with open("models/arousal_scaler.pkl", "rb") as f:
                 self.arousal_scaler: StandardScaler = pickle.load(f)
         except Exception as e:
             messagebox.showerror("Error", f"Could not load trained models: {e}")
