@@ -117,19 +117,19 @@ def main():
     # -------------------------------------------------------------------
     # Step 6. Save models + scalers
     # -------------------------------------------------------------------
-    with open("valence_model.pkl", "wb") as f:
+    with open("models/valence_model.pkl", "wb") as f:
         pickle.dump(valence_logreg, f)
-    with open("valence_scaler.pkl", "wb") as f:
+    with open("models/valence_scaler.pkl", "wb") as f:
         pickle.dump(valence_logreg_scaler, f)
-    with open("arousal_model.pkl", "wb") as f:
+    with open("models/arousal_model.pkl", "wb") as f:
         pickle.dump(arousal_logreg, f)
-    with open("arousal_scaler.pkl", "wb") as f:
+    with open("models/arousal_scaler.pkl", "wb") as f:
         pickle.dump(arousal_logreg_scaler, f)
 
     # Debug: Check feature counts
-    valence_scaler = pickle.load(open("valence_scaler.pkl", "rb"))
+    valence_scaler = pickle.load(open("models/valence_scaler.pkl", "rb"))
     print("Scaler expects (valence):", valence_scaler.n_features_in_)
-    arousal_scaler = pickle.load(open("arousal_scaler.pkl", "rb"))
+    arousal_scaler = pickle.load(open("models/arousal_scaler.pkl", "rb"))
     print("Scaler expects (arousal):", arousal_scaler.n_features_in_)
 
 
