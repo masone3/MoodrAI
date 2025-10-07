@@ -1,7 +1,7 @@
-# *🎵Sonus AI: an AI Music Mood Classifier*
+# *Moodr AI: an AI Music Mood Classifier*
 ## Description/Motivation
 
-Sonus AI is a machine learning project that predicts the mood or genre of a given song by analyzing its audio features. The project extracts features such as Mel-frequency cepstral coefficients (MFCCs), chroma, tempo, and spectral contrast from audio files, then applies machine learning and deep learning models to classify the song’s mood (e.g., happy, sad, energetic, calm). 
+Moodr AI is a machine learning project that predicts the mood or genre of a given song by analyzing its audio features. The project extracts features such as Mel-frequency cepstral coefficients (MFCCs), chroma, tempo, and spectral contrast from audio files, then applies machine learning and deep learning models to classify the song’s mood (e.g., happy, sad, energetic, calm). 
 
 This project is both fun and useful:  
 - Fun because it allows listeners to explore music based on *how it feels* rather than just by artist or title.  
@@ -17,13 +17,13 @@ The primary goal of this project is to create an application capable of analyzin
 For more information, here is the [concept link](concept.md).
 
 ## Scope
-Sonus AI will focus on analyzing audio files, extracting features, and classifying tracks into a small set of moods (e.g., happy, sad, calm, energetic). The system will include feature extraction, model training, and a simple graphical user interface (GUI) for user interaction. Out of scope are advanced features such as real-time mood classification of live audio, integration with third-party streaming services, and lyric-based sentiment analysis, which are reserved for possible future work.
+Moodr AI will focus on analyzing audio files, extracting features, and classifying tracks into a small set of moods (e.g., happy, sad, calm, energetic). The system will include feature extraction, model training, and a simple graphical user interface (GUI) for user interaction. Out of scope are advanced features such as real-time mood classification of live audio, integration with third-party streaming services, and lyric-based sentiment analysis, which are reserved for possible future work.
 
 ## Vision
 The vision of this project is to create an accessible AI tool that bridges music and emotion by automatically classifying songs into moods. When completed, the tool will provide users with a simple way to organize, understand, and interact with music emotionally—whether for personal listening, creative projects, or research. While compact in scope for this course, the system serves as a foundation for richer music-emotion applications in the future.
 
 ### Prerequisites
-To run Sonus AI, you will need the following:  
+To run Moodr AI, you will need the following:  
 - Python 3.10+ (recommended, works with 3.13 if supported by libraries)  
 - An IDE such as VS Code, PyCharm, VS Studio
 - Required Python libraries:  
@@ -59,7 +59,7 @@ For more information on the design: [design link](design.md)
 
 ## Author
 
-- **Easton Mason**: *Sonus AI* [https://www.linkedin.com/in/easton-mason/](https://www.linkedin.com/in/easton-mason/)
+- **Easton Mason**: *Moodr AI* [https://www.linkedin.com/in/easton-mason/](https://www.linkedin.com/in/easton-mason/)
 
 ## Acknowledgments
 
