@@ -1,4 +1,8 @@
 # *Moodr AI: an AI Music Mood Classifier*
+
+## Product Logo
+![Image of the logo for the Moodr AI project, added in the Markdown, of a green geometric symbol with "Moodr AI AI Music Mood Classifier wrote underneath".](MoodrAI.png)
+
 ## Description/Motivation
 
 Moodr AI is a machine learning project that predicts the mood or genre of a given song by analyzing its audio features. The project extracts features such as Mel-frequency cepstral coefficients (MFCCs), chroma, tempo, and spectral contrast from audio files, then applies machine learning and deep learning models to classify the song’s mood (e.g., happy, sad, energetic, calm). 
