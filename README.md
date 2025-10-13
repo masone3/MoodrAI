@@ -59,6 +59,8 @@ For more information on the design: [design link](design.md)
 - [TKinter](https://docs.python.org/3/library/tkinter.html/): Simple Python-based app GUI (for demo UI).
 - [Pandas](https://pandas.pydata.org/): Used for data handling, cleaning, and managing the annotation data.
 - [Numpy](https://numpy.org/) Also used for data handling, cleaning, and managing the annotation data.
+- [Pickle](https://docs.python.org/3/library/pickle.html) Used for storing and loading trained models.
+- [Matplotlib](https://matplotlib.org/) Used for displaying graphs and other results-related visuals.
 - VS Code: Primary IDE. 
 
 ## Author
