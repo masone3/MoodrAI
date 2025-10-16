@@ -8,6 +8,7 @@ Used by data_loader.py.
 
 import librosa
 import numpy as np
+import matplotlib.pyplot as plt
 
 def extract_features(audio_path, n_mfcc=20) -> dict:
     """
@@ -70,3 +71,17 @@ def extract_features(audio_path, n_mfcc=20) -> dict:
     features["tempo"] = float(tempo)
 
     return features
+
+def extract_mel_spectrogram(path, sr=22050, n_mels=128, duration: float = 30.0):
+    y, sr = librosa.load(path, sr=sr, duration=duration)
+    mel = librosa.feature.melspectrogram(y=y, sr=sr, n_mels=n_mels)
+    mel_db = librosa.power_to_db(mel, ref=np.max)
+    return mel_db
+
+def save_spectrogram_image(S_dB, output_path):
+    plt.figure(figsize=(3, 3))
+    librosa.display.specshow(S_dB, sr=22050, x_axis=None, y_axis=None)
+    plt.axis('off')
+    plt.tight_layout()
+    plt.savefig(output_path, bbox_inches='tight', pad_inches=0)
+    plt.close()
