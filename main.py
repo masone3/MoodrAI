@@ -6,11 +6,50 @@ import os
 import matplotlib.pyplot as plt
 import pandas as pd
 import pickle
+import argparse
+import random
+import numpy as np
 
 from codebase.data_loader import load_deam_annotations, add_binary_labels
 from codebase.features import extract_features
 from codebase.baseline_classifier import train_baseline_model
 
+from codebase.cnn_model import (
+    MusicMoodCNN,
+    SpectrogramDataset,
+    train,
+    build_file_label_list_from_annotations,
+)
+
+import torch
+from torch.utils.data import DataLoader, random_split
+
+def train_cnn_model(annotations_path, audio_dir, label_type, save_path, epochs=10, batch_size=16, lr=1e-3):
+    """Train CNN for given label type (valence or arousal)."""
+    print(f"\n🎧 Starting CNN training for {label_type}...\n")
+
+    # Build dataset
+    file_label_pairs = build_file_label_list_from_annotations(annotations_path, audio_dir, label_col=label_type)
+    dataset = SpectrogramDataset(file_label_pairs)
+
+    # Split train/val
+    n_total = len(dataset)
+    n_val = int(0.15 * n_total)
+    n_train = n_total - n_val
+    train_ds, val_ds = random_split(dataset, [n_train, n_val])
+
+    # Data loaders
+    train_loader = DataLoader(train_ds, batch_size=batch_size, shuffle=True, num_workers=2)
+    val_loader = DataLoader(val_ds, batch_size=batch_size, shuffle=False, num_workers=2)
+
+    # Initialize model + training setup
+    model = MusicMoodCNN(num_classes=2)
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+    # Train
+    trained_model = train(model, train_loader, val_loader, epochs=epochs, lr=lr, device=device, save_path=save_path)
+
+    print(f"\n✅ Training for {label_type} complete. Model saved to: {save_path}\n")
 
 def main():
     # -------------------------------------------------------------------
@@ -131,6 +170,30 @@ def main():
     print("Scaler expects (valence):", valence_scaler.n_features_in_)
     arousal_scaler = pickle.load(open("models/arousal_scaler.pkl", "rb"))
     print("Scaler expects (arousal):", arousal_scaler.n_features_in_)
+
+    # -------------------------------------------------------------------
+    # Step 7. Train the CNN Model
+    # -------------------------------------------------------------------
+
+    parser = argparse.ArgumentParser(description="Moodr AI Training Entry Point")
+    parser.add_argument("--mode", type=str, choices=["logreg", "cnn"], default="cnn", help="Model type to train")
+    parser.add_argument("--annotations", type=str, default="data/DEAM/processed_annotations.csv")
+    parser.add_argument("--audio_dir", type=str, default="data/DEAM/audio")
+    parser.add_argument("--epochs", type=int, default=10)
+    parser.add_argument("--batch_size", type=int, default=16)
+    parser.add_argument("--lr", type=float, default=1e-3)
+    args = parser.parse_args()
+
+    random.seed(42)
+    np.random.seed(42)
+    torch.manual_seed(42)
+
+    if args.mode == "cnn":
+        # Train for both valence and arousal
+        train_cnn_model(args.annotations, args.audio_dir, "valence_label", "models/cnn_valence_model.pth",
+                        epochs=args.epochs, batch_size=args.batch_size, lr=args.lr)
+        train_cnn_model(args.annotations, args.audio_dir, "arousal_label", "models/cnn_arousal_model.pth",
+                        epochs=args.epochs, batch_size=args.batch_size, lr=args.lr)
 
 
 if __name__ == "__main__":

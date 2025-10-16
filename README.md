@@ -75,5 +75,5 @@ For more information on the design: [design link](design.md)
 
 ## License (not required initially)
 
-This project is licensed under the ??? License - see the wiki page (https://en.wikipedia.org/wiki/Software_license) for details
+This project is licensed under the MIT License - see the wiki page (https://en.wikipedia.org/wiki/MIT_License) for details
 

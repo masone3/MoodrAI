@@ -2,7 +2,7 @@
 baseline_classifier.py
 ----------------------
 Baseline models for valence/arousal prediction.
-Includes Logistic Regression as a starting point.
+Includes Logistic Regression, SVM, and Random Forest models.
 """
 
 import pandas as pd
