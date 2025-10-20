@@ -65,13 +65,18 @@ For more information on the design: [design link](design.md)
 
 ## Author
 
-- **Easton Mason**: *Moodr AI* [https://www.linkedin.com/in/easton-mason/](https://www.linkedin.com/in/easton-mason/)
+![Simple avatar of Easton, a fair-skinned man with a brown hat, glasses, and a grey shirt.](Avatar.png)
+
+**Easton Mason**: *Moodr AI* [https://www.linkedin.com/in/easton-mason/](https://www.linkedin.com/in/easton-mason/)
+
+**Lead Developer**: Easton Mason is the lead and sole developer of this project. Born and raised in Morgantown, Kentucky, he has been passionate about both music and technology since childhood. Combining these interests, Easton designed this application to explore the intersection of sound, emotion, and machine learning. He enjoys discovering new artists across all genres and finding creative ways to connect technology with the art of music.
 
 ## Acknowledgments
 
 - [DEAM Dataset](https://cvml.unige.ch/databases/DEAM/) for mood classification research and initial audio classification experiments.  
 - Tutorials and documentation from the Librosa, Scikit-learn, and PyTorch communities.
-- Doctor Wilborne and peers at Berea College who provided feedback and brainstorming support.  
+- Professor Wilborne and peers at Berea College who provided feedback and brainstorming support.  
+- Berea College
 
 ## License (not required initially)
 
