@@ -9,6 +9,7 @@ Features:
 
 import tkinter as tk
 from tkinter import filedialog, messagebox, ttk
+import torch
 import pandas as pd
 import os
 import pickle
@@ -28,50 +29,104 @@ class MusicMoodGUI:
         self.canvas = None
         
         self.root = root
-
-        # -------------------------------
-        # Try to load custom Forest theme
-        # -------------------------------
-        try:
-            theme = os.path.abspath("theme/forest-dark.tcl")
-
-            theme_path = os.path.join(os.path.dirname(__file__), "theme", theme)
-            if os.path.exists(theme_path):
-                self.root.tk.call('source', theme)
-                style = ttk.Style(self.root)
-                style.theme_use("forest-dark")
-                print("🌲 Forest Dark theme loaded successfully.")
-            else:
-                raise FileNotFoundError("forest-dark.tcl not found in theme folder.")
-        except Exception as e:
-            print(f"⚠️ Theme load failed: {e}")
-            messagebox.showwarning(
-                "Theme Warning",
-                f"Could not load 'forest-dark' theme. Using default instead.\n\n({e})"
-            )
-            style = ttk.Style(self.root)
-            style.theme_use("default")
-
         self.root.title("Moodr AI - Music Mood Classifier")
         self.root.geometry("600x650")
 
         # -------------------------------
+        # Simple custom grey–purple–white theme
+        # -------------------------------
+        style = ttk.Style()
+
+        # Set overall background
+        root_bg = "#2E2E2E"    # dark grey background
+        accent_purple = "#8A56AC"
+        light_grey = "#F5F5F5"
+        text_white = "#FFFFFF"
+
+        # Configure window background
+        self.root.configure(bg=root_bg)
+
+        # Use 'clam' theme as base (better color support)
+        style.theme_use("clam")
+
+        # General widget styling
+        style.configure(
+            ".",  # apply to all ttk widgets
+            background=root_bg,
+            foreground=text_white,
+            font=("Helvetica", 11),
+        )
+
+        # Buttons
+        style.configure(
+            "TButton",
+            background=accent_purple,
+            foreground=text_white,
+            padding=6,
+            relief="flat",
+            font=("Helvetica", 11, "bold")
+        )
+        style.map(
+            "TButton",
+            background=[("active", "#A678C0")],  # lighter purple on hover
+        )
+
+        # Labels
+        style.configure(
+            "TLabel",
+            background=root_bg,
+            foreground=light_grey,
+            font=("Helvetica", 11)
+        )
+
+        # Combobox
+        style.configure(
+            "TCombobox",
+            fieldbackground="#3E3E3E",
+            background="#3E3E3E",
+            foreground=text_white,
+            arrowcolor=accent_purple
+        )
+
+        # -------------------------------
         # Header
         # -------------------------------
-
         title_label = ttk.Label(
-            self.root, text="🎵 Moodr AI: Music Mood Classifier 🎵",
-            font=("Helvetica", 16, "bold")
+            self.root,
+            text="🎵 Moodr AI: Music Mood Classifier 🎵",
+            font=("Helvetica", 16, "bold"),
+            foreground=accent_purple,
+            background=root_bg
         )
         title_label.pack(pady=10)
 
         # -------------------------------
         # File selection
         # -------------------------------
-
         self.file_label = ttk.Label(self.root, text="No file selected")
+        self.file_label.configure(background=root_bg, foreground=light_grey)
         self.file_label.pack(pady=10)
 
+        # -------------------------------
+        # Model selection dropdown
+        # -------------------------------
+        self.model_type_var = tk.StringVar(value="scikit")
+        model_label = ttk.Label(self.root, text="Select Model Type:")
+        model_label.configure(background=root_bg, foreground=light_grey)
+        model_label.pack(pady=5)
+
+        self.model_selector = ttk.Combobox(
+            self.root,
+            textvariable=self.model_type_var,
+            values=["scikit", "cnn"],
+            state="readonly"
+        )
+        self.model_selector.pack(pady=5)
+        self.model_selector.bind("<<ComboboxSelected>>", self.apply_model_selection)
+
+        # -------------------------------
+        # Buttons
+        # -------------------------------
         self.select_btn = ttk.Button(self.root, text="Select Audio File", command=self.select_file)
         self.select_btn.pack(pady=5)
 
@@ -81,24 +136,23 @@ class MusicMoodGUI:
         # -------------------------------
         # Output box
         # -------------------------------
-        self.output_box = tk.Text(root, height=10, width=50)
+        self.output_box = tk.Text(
+            self.root,
+            height=10,
+            width=50,
+            bg="#3A3A3A",       # dark grey field
+            fg=text_white,
+            insertbackground=text_white,  # cursor color
+            relief="flat",
+            padx=10,
+            pady=5
+        )
         self.output_box.pack(pady=10)
 
         # -------------------------------
-        # Load models and scalers
+        # Load initial models (default: Scikit)
         # -------------------------------
-        try:
-            with open("models/valence_model.pkl", "rb") as f:
-                self.valence_model: LogisticRegression = pickle.load(f)
-            with open("models/valence_scaler.pkl", "rb") as f:
-                self.valence_scaler: StandardScaler = pickle.load(f)
-            with open("models/arousal_model.pkl", "rb") as f:
-                self.arousal_model: LogisticRegression = pickle.load(f)
-            with open("models/arousal_scaler.pkl", "rb") as f:
-                self.arousal_scaler: StandardScaler = pickle.load(f)
-        except Exception as e:
-            messagebox.showerror("Error", f"Could not load trained models: {e}")
-            return
+        self.apply_model_selection()
 
         # -------------------------------
         # Load training feature columns
@@ -114,6 +168,49 @@ class MusicMoodGUI:
         except Exception as e:
             messagebox.showerror("Error", f"Could not load feature columns: {e}")
             self.feature_cols = None
+
+    # ------------------------------------------------------
+    # Reload models based on selection
+    # ------------------------------------------------------
+    def apply_model_selection(self, *args):
+        self.model_type = self.model_type_var.get()
+        print(f"🔄 Switching to model type: {self.model_type}")
+
+        if self.model_type == "scikit":
+            try:
+                with open("models/valence_model.pkl", "rb") as f:
+                    self.valence_model = pickle.load(f)
+                with open("models/valence_scaler.pkl", "rb") as f:
+                    self.valence_scaler = pickle.load(f)
+                with open("models/arousal_model.pkl", "rb") as f:
+                    self.arousal_model = pickle.load(f)
+                with open("models/arousal_scaler.pkl", "rb") as f:
+                    self.arousal_scaler = pickle.load(f)
+                print("✅ Scikit-learn models and scalers loaded successfully.")
+            except Exception as e:
+                messagebox.showerror("Error", f"Could not load Scikit-learn models: {e}")
+
+        elif self.model_type == "cnn":
+            try:
+                import torch
+                from codebase.cnn_model import MusicMoodCNN, extract_mel_spectrogram
+
+                self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+                # Load valence and arousal CNNs
+                self.valence_model = MusicMoodCNN(num_classes=2)
+                self.valence_model.load_state_dict(torch.load("models/cnn_valence_model.pth", map_location=self.device))
+                self.valence_model.to(self.device).eval()
+
+                self.arousal_model = MusicMoodCNN(num_classes=2)
+                self.arousal_model.load_state_dict(torch.load("models/cnn_arousal_model.pth", map_location=self.device))
+                self.arousal_model.to(self.device).eval()
+
+                self.extract_mel_spectrogram = extract_mel_spectrogram
+                print("✅ CNN models loaded successfully.")
+            except Exception as e:
+                messagebox.showerror("Error", f"Could not load CNN models: {e}")
+
 
     # ------------------------------------------------------
     # File selection
@@ -132,49 +229,55 @@ class MusicMoodGUI:
         if not hasattr(self, "filepath"):
             messagebox.showwarning("Warning", "Please select a file first.")
             return
-        if self.feature_cols is None:
-            messagebox.showerror("Error", "Feature columns not available.")
-            return
+
+        model_type = self.model_type_var.get()
 
         try:
-            # Extract features
-            feats = extract_features(self.filepath)
-            df = pd.DataFrame([feats])
+            if model_type == "scikit":
+                # ----------------------------
+                # SCIKIT-LEARN PATH
+                # ----------------------------
+                assert hasattr(self.valence_model, "predict_proba"), "Expected Scikit model, got CNN"
+                
+                feats = extract_features(self.filepath)
+                df = pd.DataFrame([feats]).reindex(columns=self.feature_cols, fill_value=0)
 
-            # Align columns
-            df = df.reindex(columns=self.feature_cols, fill_value=0)
+                X_scaled_val = self.valence_scaler.transform(df.values)
+                valence_prob = self.valence_model.predict_proba(X_scaled_val)[0][1]
+
+                X_scaled_ar = self.arousal_scaler.transform(df.values)
+                arousal_prob = self.arousal_model.predict_proba(X_scaled_ar)[0][1]
+
+            elif model_type == "cnn":
+                # ----------------------------
+                # CNN PATH
+                # ----------------------------
+                assert hasattr(self.valence_model, "forward"), "Expected CNN model, got Scikit"
+
+                S_val = self.extract_mel_spectrogram(self.filepath)
+                S_val = torch.tensor(S_val, dtype=torch.float32).unsqueeze(0).unsqueeze(0).to(self.device)
+
+                with torch.no_grad():
+                    valence_logits = self.valence_model(S_val)
+                    arousal_logits = self.arousal_model(S_val)
+                    valence_prob = torch.softmax(valence_logits, dim=1)[0, 1].item()
+                    arousal_prob = torch.softmax(arousal_logits, dim=1)[0, 1].item()
 
             # ----------------------------
-            # Valence prediction (continuous)
-            # ----------------------------
-            X_scaled_val = self.valence_scaler.transform(df.values)
-            valence_prob = self.valence_model.predict_proba(X_scaled_val)[0][1]  # P(High)
-
-            # ----------------------------
-            # Arousal prediction (continuous)
-            # ----------------------------
-            X_scaled_ar = self.arousal_scaler.transform(df.values)
-            arousal_prob = self.arousal_model.predict_proba(X_scaled_ar)[0][1]  # P(High)
-
-            # ----------------------------
-            # Display results
+            # Shared display section
             # ----------------------------
             self.output_box.delete("1.0", tk.END)
             self.output_box.insert(tk.END, f"File: {os.path.basename(self.filepath)}\n\n")
             self.output_box.insert(tk.END, f"Valence (0=Low, 1=High): {valence_prob:.2f}\n")
             self.output_box.insert(tk.END, f"Arousal (0=Low, 1=High): {arousal_prob:.2f}\n")
 
-            # ----------------------------
-            # Normalize probabilities to -1..1 scale for plotting
-            # ----------------------------
             valence_scaled = (valence_prob * 2) - 1
             arousal_scaled = (arousal_prob * 2) - 1
-
-            # Show visualization
             self.show_valence_arousal_plot(valence_scaled, arousal_scaled)
 
         except Exception as e:
             messagebox.showerror("Prediction Error", f"Could not classify file: {e}")
+
 
     # ------------------------------------------------------
     # Visualization

@@ -198,6 +198,9 @@ def test_model(model, loader, device):
     plt.tight_layout()
     plt.show()
 
+    with open("test_results.txt", "w") as f:
+        f.write(f"Accuracy: {acc:.4f}\nPrecision: {precision:.4f}\nRecall: {recall:.4f}\nF1: {f1:.4f}\n")
+
     return acc, precision, recall, f1
 
 
