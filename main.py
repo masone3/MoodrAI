@@ -19,6 +19,7 @@ from codebase.cnn_model import (
     SpectrogramDataset,
     train,
     build_file_label_list_from_annotations,
+    evaluate_cnn_calibration
 )
 
 import torch
@@ -195,6 +196,52 @@ def main():
         train_cnn_model(args.annotations, args.audio_dir, "arousal_label", "models/cnn_arousal_model.pth",
                         epochs=args.epochs, batch_size=args.batch_size, lr=args.lr)
 
+    # -----------------------------------------------------------
+    # Step 8. Evaluate CNN Models with Calibration Diagnostics
+    # -----------------------------------------------------------
+    print("\n📊 Evaluating CNN Models on Test Splits...\n")
+
+    # Rebuild dataset (same as in training)
+    file_label_pairs_val = build_file_label_list_from_annotations(args.annotations, args.audio_dir, label_col="valence_label")
+    file_label_pairs_aro = build_file_label_list_from_annotations(args.annotations, args.audio_dir, label_col="arousal_label")
+
+    dataset_val = SpectrogramDataset(file_label_pairs_val)
+    dataset_aro = SpectrogramDataset(file_label_pairs_aro)
+
+    # Create train/val/test splits (80/10/10)
+    n_total_val = len(dataset_val)
+    n_test_val = int(0.1 * n_total_val)
+    n_val_val = int(0.1 * n_total_val)
+    n_train_val = n_total_val - n_val_val - n_test_val
+
+    n_total_aro = len(dataset_aro)
+    n_test_aro = int(0.1 * n_total_aro)
+    n_val_aro = int(0.1 * n_total_aro)
+    n_train_aro = n_total_aro - n_val_aro - n_test_aro
+
+    _, _, test_set_val = random_split(dataset_val, [n_train_val, n_val_val, n_test_val])
+    _, _, test_set_aro = random_split(dataset_aro, [n_train_aro, n_val_aro, n_test_aro])
+
+    test_loader_val = DataLoader(test_set_val, batch_size=8, shuffle=False)
+    test_loader_aro = DataLoader(test_set_aro, batch_size=8, shuffle=False)
+
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+    # Load trained models
+    model_valence = MusicMoodCNN(num_classes=2)
+    model_valence.load_state_dict(torch.load("models/cnn_valence_model.pth", map_location=device))
+    model_valence.to(device)
+
+    model_arousal = MusicMoodCNN(num_classes=2)
+    model_arousal.load_state_dict(torch.load("models/cnn_arousal_model.pth", map_location=device))
+    model_arousal.to(device)
+
+    # Run calibration + evaluation
+    print("🔎 Evaluating Valence CNN...")
+    evaluate_cnn_calibration(model_valence, test_loader_val, device, title="Valence CNN")
+
+    print("\n🔎 Evaluating Arousal CNN...")
+    evaluate_cnn_calibration(model_arousal, test_loader_aro, device, title="Arousal CNN")
 
 if __name__ == "__main__":
     main()
