@@ -11,6 +11,7 @@ import random
 from typing import List, Tuple, Optional
 
 import numpy as np
+from collections import Counter
 import torch
 import torch.nn as nn
 from torch.utils.data import Dataset, DataLoader, random_split
@@ -19,6 +20,7 @@ import seaborn as sns
 
 from sklearn.metrics import (
     precision_score,
+    accuracy_score,
     recall_score,
     f1_score,
     classification_report,
@@ -160,6 +162,105 @@ def evaluate(model, loader, criterion, device):
             total += X.size(0)
     return total_loss / total, correct / total
 
+def evaluate_cnn_calibration(model, dataloader, device, title="CNN Calibration"):
+    """
+    Evaluate how confident the CNN is in its predictions vs. its actual accuracy.
+    Produces:
+    - Histogram of predicted probabilities
+    - Calibration curve
+    - Confusion matrix
+    - Summary metrics
+    """
+    model.eval()
+    all_probs = []
+    all_preds = []
+    all_labels = []
+
+    with torch.no_grad():
+        for X, y in dataloader:
+            X, y = X.to(device), y.to(device)
+            logits = model(X)
+            probs = torch.softmax(logits, dim=1)[:, 1]  # probability of "High" class
+            preds = (probs >= 0.5).long()
+
+            all_probs.extend(probs.cpu().numpy())
+            all_preds.extend(preds.cpu().numpy())
+            all_labels.extend(y.cpu().numpy())
+
+            all_probs = np.array(all_probs)
+            all_preds = np.array(all_preds)
+            all_labels = np.array(all_labels)
+
+            # --- Summary metrics ---
+            acc = accuracy_score(all_labels, all_preds)
+            f1 = f1_score(all_labels, all_preds)
+            precision = precision_score(all_labels, all_preds)
+            recall = recall_score(all_labels, all_preds)
+
+            print(f"\n📊 {title} Evaluation")
+            print(f"Accuracy : {acc:.3f}")
+            print(f"Precision: {precision:.3f}")
+            print(f"Recall   : {recall:.3f}")
+            print(f"F1-score : {f1:.3f}")
+
+            # --- Confusion Matrix ---
+            cm = confusion_matrix(all_labels, all_preds)
+            plt.figure(figsize=(4, 4))
+            sns.heatmap(cm, annot=True, fmt="d", cmap="Blues", xticklabels=["Low", "High"], yticklabels=["Low", "High"])
+            plt.title(f"{title} - Confusion Matrix")
+            plt.xlabel("Predicted")
+            plt.ylabel("True")
+            plt.tight_layout()
+            plt.show()
+            plt.savefig(f"data/images/{title.replace(' ', '_')}_calibration.png")
+
+            # --- Probability Histogram ---
+            plt.figure(figsize=(6, 4))
+            sns.histplot(all_probs[all_labels == 0], color="red", label="True Low", kde=True)
+            sns.histplot(all_probs[all_labels == 1], color="green", label="True High", kde=True)
+            plt.title(f"{title} - Predicted Probability Distribution")
+            plt.xlabel("Predicted Probability for 'High'")
+            plt.ylabel("Frequency")
+            plt.legend()
+            plt.tight_layout()
+            plt.show()
+            plt.savefig(f"data/images/{title.replace(' ', '_')}_calibration.png")
+
+            # --- Calibration Curve ---
+            bins = np.linspace(0, 1, 11)
+            bin_centers = (bins[:-1] + bins[1:]) / 2
+            acc_per_bin = []
+            conf_per_bin = []
+
+            for i in range(len(bins) - 1):
+                bin_mask = (all_probs >= bins[i]) & (all_probs < bins[i + 1])
+                if np.sum(bin_mask) > 0:
+                    bin_acc = np.mean(all_labels[bin_mask] == all_preds[bin_mask])
+                    bin_conf = np.mean(all_probs[bin_mask])
+                    acc_per_bin.append(bin_acc)
+                    conf_per_bin.append(bin_conf)
+
+            plt.figure(figsize=(5, 5))
+            plt.plot(conf_per_bin, acc_per_bin, marker="o", label="Model Calibration")
+            plt.plot([0, 1], [0, 1], linestyle="--", color="gray", label="Perfect Calibration")
+            plt.xlabel("Confidence (Predicted Probability)")
+            plt.ylabel("Accuracy")
+            plt.title(f"{title} - Calibration Curve")
+            plt.legend()
+            plt.tight_layout()
+            plt.show()
+            plt.savefig(f"data/images/{title.replace(' ', '_')}_calibration.png")
+
+            return {
+                "accuracy": acc,
+                "f1": f1,
+                "precision": precision,
+                "recall": recall,
+                "probs": all_probs,
+                "preds": all_preds,
+                "labels": all_labels
+            }
+
 
 def test_model(model, loader, device):
     model.eval()
@@ -197,11 +298,19 @@ def test_model(model, loader, device):
     plt.xlabel("Predicted Label")
     plt.tight_layout()
     plt.show()
+    plt.savefig(f"data/images/cnn_confusion_matrix.png")
 
     with open("test_results.txt", "w") as f:
         f.write(f"Accuracy: {acc:.4f}\nPrecision: {precision:.4f}\nRecall: {recall:.4f}\nF1: {f1:.4f}\n")
 
     return acc, precision, recall, f1
+
+def compute_class_weights(file_label_pairs):
+    labels = [label for _, label in file_label_pairs]
+    counts = Counter(labels)
+    total = sum(counts.values())
+    weights = [total / counts[i] for i in sorted(counts.keys())]
+    return weights
 
 
 def train(model, train_loader, val_loader, epochs=10, lr=1e-3, device=None, save_path=None):
@@ -210,7 +319,15 @@ def train(model, train_loader, val_loader, epochs=10, lr=1e-3, device=None, save
     model.to(device)
 
     optimizer = torch.optim.Adam(model.parameters(), lr=lr)
-    criterion = nn.CrossEntropyLoss()
+    
+    if hasattr(train_loader.dataset, 'items'):
+        file_label_pairs = train_loader.dataset.items
+        weights = compute_class_weights(file_label_pairs)
+        print(f"Using class weights: {weights}")
+        weights_tensor = torch.tensor(weights, dtype=torch.float32).to(device)
+        criterion = nn.CrossEntropyLoss(weight=weights_tensor)
+    else:
+        criterion = nn.CrossEntropyLoss()
 
     best_val_acc = 0.0
     for epoch in range(1, epochs + 1):

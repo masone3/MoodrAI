@@ -238,7 +238,7 @@ class MusicMoodGUI:
                 # SCIKIT-LEARN PATH
                 # ----------------------------
                 assert hasattr(self.valence_model, "predict_proba"), "Expected Scikit model, got CNN"
-                
+
                 feats = extract_features(self.filepath)
                 df = pd.DataFrame([feats]).reindex(columns=self.feature_cols, fill_value=0)
 
@@ -255,13 +255,29 @@ class MusicMoodGUI:
                 assert hasattr(self.valence_model, "forward"), "Expected CNN model, got Scikit"
 
                 S_val = self.extract_mel_spectrogram(self.filepath)
+                S_val = (S_val - S_val.mean()) / (S_val.std() + 1e-6)
                 S_val = torch.tensor(S_val, dtype=torch.float32).unsqueeze(0).unsqueeze(0).to(self.device)
 
                 with torch.no_grad():
+                    #valence_logits = self.valence_model(S_val)
+                    #arousal_logits = self.arousal_model(S_val)
+                    #valence_prob = torch.softmax(valence_logits, dim=1)[0, 1].item()
+                    #arousal_prob = torch.softmax(arousal_logits, dim=1)[0, 1].item()
+
                     valence_logits = self.valence_model(S_val)
                     arousal_logits = self.arousal_model(S_val)
-                    valence_prob = torch.softmax(valence_logits, dim=1)[0, 1].item()
-                    arousal_prob = torch.softmax(arousal_logits, dim=1)[0, 1].item()
+
+                    valence_softmax = torch.softmax(valence_logits, dim=1)
+                    arousal_softmax = torch.softmax(arousal_logits, dim=1)
+
+                    valence_prob = valence_softmax[0, 1].item()
+                    arousal_prob = arousal_softmax[0, 1].item()
+
+                print("DEBUG — raw logits:", valence_logits.cpu().numpy(), arousal_logits.cpu().numpy())
+                print("DEBUG — softmax:", valence_softmax.cpu().numpy(), arousal_softmax.cpu().numpy())
+                print("DEBUG — probs:", valence_prob, arousal_prob)
+
+                    
 
             # ----------------------------
             # Shared display section
