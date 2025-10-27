@@ -15,6 +15,7 @@ import os
 import pickle
 
 from codebase.features import extract_features
+from codebase.features_extra import extract_audio_stats
 
 from sklearn.preprocessing import StandardScaler
 from sklearn.linear_model import LogisticRegression
@@ -254,16 +255,21 @@ class MusicMoodGUI:
                 # ----------------------------
                 assert hasattr(self.valence_model, "forward"), "Expected CNN model, got Scikit"
 
+                # Prepare inputs
                 S_val = self.extract_mel_spectrogram(self.filepath)
                 S_val = (S_val - S_val.mean()) / (S_val.std() + 1e-6)
                 S_val = torch.tensor(S_val, dtype=torch.float32).unsqueeze(0).unsqueeze(0).to(self.device)
 
-                with torch.no_grad():
-                    #valence_logits = self.valence_model(S_val)
-                    #arousal_logits = self.arousal_model(S_val)
-                    #valence_prob = torch.softmax(valence_logits, dim=1)[0, 1].item()
-                    #arousal_prob = torch.softmax(arousal_logits, dim=1)[0, 1].item()
+                global_feats = extract_audio_stats(self.filepath)
+                global_feats = torch.tensor(global_feats, dtype=torch.float32).unsqueeze(0).to(self.device)
 
+                with torch.no_grad():
+                    valence_logits = self.valence_model(S_val, global_feats)
+                    arousal_logits = self.arousal_model(S_val, global_feats)
+                    valence_prob = torch.softmax(valence_logits, dim=1)[0, 1].item()
+                    arousal_prob = torch.softmax(arousal_logits, dim=1)[0, 1].item()
+
+                """
                     valence_logits = self.valence_model(S_val)
                     arousal_logits = self.arousal_model(S_val)
 
@@ -276,6 +282,7 @@ class MusicMoodGUI:
                 print("DEBUG — raw logits:", valence_logits.cpu().numpy(), arousal_logits.cpu().numpy())
                 print("DEBUG — softmax:", valence_softmax.cpu().numpy(), arousal_softmax.cpu().numpy())
                 print("DEBUG — probs:", valence_prob, arousal_prob)
+                """
 
                     
 

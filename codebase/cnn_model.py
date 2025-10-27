@@ -18,6 +18,8 @@ from torch.utils.data import Dataset, DataLoader, random_split
 import matplotlib.pyplot as plt
 import seaborn as sns
 
+from codebase.features_extra import extract_audio_stats
+
 from sklearn.metrics import (
     precision_score,
     accuracy_score,
@@ -44,11 +46,11 @@ except Exception as e:
 # ---------------------------
 class MusicMoodCNN(nn.Module):
     """
-    Small CNN for spectrogram classification (valence/arousal).
-    Uses AdaptiveAvgPool2d for variable time dimension handling.
+    CNN for valence/arousal prediction using mel spectrograms + global features.
     """
-    def __init__(self, num_classes: int = 2, final_pool_size: Tuple[int, int] = (4, 4), dropout: float = 0.3):
+    def __init__(self, num_classes=2, global_feat_dim=4, final_pool_size=(4, 4), dropout=0.3):
         super().__init__()
+        # Spectrogram feature extractor
         self.conv1 = nn.Sequential(
             nn.Conv2d(1, 16, kernel_size=3, padding=1),
             nn.BatchNorm2d(16),
@@ -72,16 +74,23 @@ class MusicMoodCNN(nn.Module):
         pooled_h, pooled_w = final_pool_size
         flattened = 64 * pooled_h * pooled_w
 
-        self.fc1 = nn.Linear(flattened, 128)
+        # Merge spectrogram features + global stats
+        self.fc1 = nn.Linear(flattened + global_feat_dim, 128)
         self.dropout = nn.Dropout(dropout)
         self.fc2 = nn.Linear(128, num_classes)
 
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
+    def forward(self, x, global_feats=None):
+        # CNN path
         x = self.conv1(x)
         x = self.conv2(x)
         x = self.conv3(x)
         x = self.adaptive_pool(x)
         x = torch.flatten(x, 1)
+
+        # Concatenate global features if available
+        if global_feats is not None:
+            x = torch.cat([x, global_feats], dim=1)
+
         x = self.dropout(torch.relu(self.fc1(x)))
         return self.fc2(x)
 
@@ -106,17 +115,22 @@ class SpectrogramDataset(Dataset):
     def __getitem__(self, idx):
         audio_path, label = self.items[idx]
         S_dB = extract_mel_spectrogram(audio_path, sr=self.sr, n_mels=self.n_mels, duration=self.duration)
-        if not np.isfinite(S_dB).all():
-            S_dB = np.nan_to_num(S_dB)
 
+        # Normalize spectrogram
+        S_dB = np.nan_to_num(S_dB)
         if self.normalize:
-            mean = S_dB.mean()
-            std = S_dB.std() if S_dB.std() > 0 else 1.0
-            S_dB = (S_dB - mean) / std
+            S_dB = (S_dB - S_dB.mean()) / (S_dB.std() + 1e-6)
 
-        tensor = torch.tensor(S_dB, dtype=torch.float32).unsqueeze(0)
-        label_tensor = torch.tensor(int(label), dtype=torch.long)
-        return tensor, label_tensor
+        # Convert to tensor
+        S_tensor = torch.tensor(S_dB, dtype=torch.float32).unsqueeze(0)
+
+        # Global features
+        global_feats = extract_audio_stats(audio_path)
+        #print(f"[DEBUG] {audio_path} | global_feats shape: {global_feats.shape} | values: {global_feats}")
+
+        global_feats_tensor = torch.tensor(global_feats, dtype=torch.float32)
+
+        return S_tensor, global_feats_tensor, torch.tensor(label, dtype=torch.long)
 
 
 # ---------------------------
@@ -126,18 +140,16 @@ def train_epoch(model, loader, optimizer, criterion, device):
     model.train()
     total_loss, correct, total = 0, 0, 0
 
-    for batch_idx, (X, y) in enumerate(loader):
-        # ✅ Print which files are being used in this batch (optional)
-        file_indices = loader.dataset.indices if hasattr(loader.dataset, 'indices') else range(len(loader.dataset))
-        if batch_idx % 10 == 0:  # every 10 batches
-            print(f"[Train Batch {batch_idx}] Processing {len(X)} spectrograms")
+    for batch_idx, (X, global_feats, y) in enumerate(loader):
+        if batch_idx % 10 == 0:  # print every 10 batches
+            print(f"[Train Batch {batch_idx}] Processing batch size: {X.size(0)}")
 
-        X, y = X.to(device), y.to(device)
+        X, global_feats, y = X.to(device), global_feats.to(device), y.to(device)
 
-    for X, y in loader:
-        X, y = X.to(device), y.to(device)
+    for X, global_feats, y in loader:
+        X, global_feats, y = X.to(device), global_feats.to(device), y.to(device)
         optimizer.zero_grad()
-        logits = model(X)
+        logits = model(X, global_feats)
         loss = criterion(logits, y)
         loss.backward()
         optimizer.step()
@@ -145,7 +157,6 @@ def train_epoch(model, loader, optimizer, criterion, device):
         total_loss += loss.item() * X.size(0)
         correct += (logits.argmax(dim=1) == y).sum().item()
         total += X.size(0)
-
     return total_loss / total, correct / total
 
 
@@ -153,9 +164,9 @@ def evaluate(model, loader, criterion, device):
     model.eval()
     total_loss, correct, total = 0, 0, 0
     with torch.no_grad():
-        for X, y in loader:
-            X, y = X.to(device), y.to(device)
-            logits = model(X)
+        for X, global_feats, y in loader:
+            X, global_feats, y = X.to(device), global_feats.to(device), y.to(device)
+            logits = model(X, global_feats)
             loss = criterion(logits, y)
             total_loss += loss.item() * X.size(0)
             correct += (logits.argmax(dim=1) == y).sum().item()
@@ -164,22 +175,15 @@ def evaluate(model, loader, criterion, device):
 
 def evaluate_cnn_calibration(model, dataloader, device, title="CNN Calibration"):
     """
-    Evaluate how confident the CNN is in its predictions vs. its actual accuracy.
-    Produces:
-    - Histogram of predicted probabilities
-    - Calibration curve
-    - Confusion matrix
-    - Summary metrics
+    Evaluate how confident the CNN is in its predictions vs. actual accuracy.
     """
     model.eval()
-    all_probs = []
-    all_preds = []
-    all_labels = []
+    all_probs, all_preds, all_labels = [], [], []
 
     with torch.no_grad():
-        for X, y in dataloader:
-            X, y = X.to(device), y.to(device)
-            logits = model(X)
+        for X, global_feats, y in dataloader:
+            X, global_feats, y = X.to(device), global_feats.to(device), y.to(device)
+            logits = model(X, global_feats)
             probs = torch.softmax(logits, dim=1)[:, 1]  # probability of "High" class
             preds = (probs >= 0.5).long()
 
@@ -187,79 +191,76 @@ def evaluate_cnn_calibration(model, dataloader, device, title="CNN Calibration")
             all_preds.extend(preds.cpu().numpy())
             all_labels.extend(y.cpu().numpy())
 
-            all_probs = np.array(all_probs)
-            all_preds = np.array(all_preds)
-            all_labels = np.array(all_labels)
+    # Convert to numpy
+    all_probs = np.array(all_probs)
+    all_preds = np.array(all_preds)
+    all_labels = np.array(all_labels)
 
-            # --- Summary metrics ---
-            acc = accuracy_score(all_labels, all_preds)
-            f1 = f1_score(all_labels, all_preds)
-            precision = precision_score(all_labels, all_preds)
-            recall = recall_score(all_labels, all_preds)
+    # --- Summary metrics ---
+    acc = accuracy_score(all_labels, all_preds)
+    f1 = f1_score(all_labels, all_preds)
+    precision = precision_score(all_labels, all_preds)
+    recall = recall_score(all_labels, all_preds)
 
-            print(f"\n📊 {title} Evaluation")
-            print(f"Accuracy : {acc:.3f}")
-            print(f"Precision: {precision:.3f}")
-            print(f"Recall   : {recall:.3f}")
-            print(f"F1-score : {f1:.3f}")
+    print(f"\n📊 {title} Evaluation")
+    print(f"Accuracy : {acc:.3f}")
+    print(f"Precision: {precision:.3f}")
+    print(f"Recall   : {recall:.3f}")
+    print(f"F1-score : {f1:.3f}")
 
-            # --- Confusion Matrix ---
-            cm = confusion_matrix(all_labels, all_preds)
-            plt.figure(figsize=(4, 4))
-            sns.heatmap(cm, annot=True, fmt="d", cmap="Blues", xticklabels=["Low", "High"], yticklabels=["Low", "High"])
-            plt.title(f"{title} - Confusion Matrix")
-            plt.xlabel("Predicted")
-            plt.ylabel("True")
-            plt.tight_layout()
-            plt.show()
-            plt.savefig(f"data/images/{title.replace(' ', '_')}_calibration.png")
+    # --- Confusion Matrix ---
+    cm = confusion_matrix(all_labels, all_preds)
+    plt.figure(figsize=(4, 4))
+    sns.heatmap(cm, annot=True, fmt="d", cmap="Blues", xticklabels=["Low", "High"], yticklabels=["Low", "High"])
+    plt.title(f"{title} - Confusion Matrix")
+    plt.xlabel("Predicted")
+    plt.ylabel("True")
+    plt.tight_layout()
+    plt.show()
 
-            # --- Probability Histogram ---
-            plt.figure(figsize=(6, 4))
-            sns.histplot(all_probs[all_labels == 0], color="red", label="True Low", kde=True)
-            sns.histplot(all_probs[all_labels == 1], color="green", label="True High", kde=True)
-            plt.title(f"{title} - Predicted Probability Distribution")
-            plt.xlabel("Predicted Probability for 'High'")
-            plt.ylabel("Frequency")
-            plt.legend()
-            plt.tight_layout()
-            plt.show()
-            plt.savefig(f"data/images/{title.replace(' ', '_')}_calibration.png")
+    # --- Probability Histogram ---
+    plt.figure(figsize=(6, 4))
+    sns.histplot(all_probs[all_labels == 0], color="red", label="True Low", kde=True)
+    sns.histplot(all_probs[all_labels == 1], color="green", label="True High", kde=True)
+    plt.title(f"{title} - Predicted Probability Distribution")
+    plt.xlabel("Predicted Probability for 'High'")
+    plt.ylabel("Frequency")
+    plt.legend()
+    plt.tight_layout()
+    plt.show()
 
-            # --- Calibration Curve ---
-            bins = np.linspace(0, 1, 11)
-            bin_centers = (bins[:-1] + bins[1:]) / 2
-            acc_per_bin = []
-            conf_per_bin = []
+    # --- Calibration Curve ---
+    bins = np.linspace(0, 1, 11)
+    bin_centers = (bins[:-1] + bins[1:]) / 2
+    acc_per_bin, conf_per_bin = [], []
 
-            for i in range(len(bins) - 1):
-                bin_mask = (all_probs >= bins[i]) & (all_probs < bins[i + 1])
-                if np.sum(bin_mask) > 0:
-                    bin_acc = np.mean(all_labels[bin_mask] == all_preds[bin_mask])
-                    bin_conf = np.mean(all_probs[bin_mask])
-                    acc_per_bin.append(bin_acc)
-                    conf_per_bin.append(bin_conf)
+    for i in range(len(bins) - 1):
+        bin_mask = (all_probs >= bins[i]) & (all_probs < bins[i + 1])
+        if np.sum(bin_mask) > 0:
+            bin_acc = np.mean(all_labels[bin_mask] == all_preds[bin_mask])
+            bin_conf = np.mean(all_probs[bin_mask])
+            acc_per_bin.append(bin_acc)
+            conf_per_bin.append(bin_conf)
 
-            plt.figure(figsize=(5, 5))
-            plt.plot(conf_per_bin, acc_per_bin, marker="o", label="Model Calibration")
-            plt.plot([0, 1], [0, 1], linestyle="--", color="gray", label="Perfect Calibration")
-            plt.xlabel("Confidence (Predicted Probability)")
-            plt.ylabel("Accuracy")
-            plt.title(f"{title} - Calibration Curve")
-            plt.legend()
-            plt.tight_layout()
-            plt.show()
-            plt.savefig(f"data/images/{title.replace(' ', '_')}_calibration.png")
+    plt.figure(figsize=(5, 5))
+    plt.plot(conf_per_bin, acc_per_bin, marker="o", label="Model Calibration")
+    plt.plot([0, 1], [0, 1], linestyle="--", color="gray", label="Perfect Calibration")
+    plt.xlabel("Confidence (Predicted Probability)")
+    plt.ylabel("Accuracy")
+    plt.title(f"{title} - Calibration Curve")
+    plt.legend()
+    plt.tight_layout()
+    plt.show()
 
-            return {
-                "accuracy": acc,
-                "f1": f1,
-                "precision": precision,
-                "recall": recall,
-                "probs": all_probs,
-                "preds": all_preds,
-                "labels": all_labels
-            }
+    return {
+        "accuracy": acc,
+        "f1": f1,
+        "precision": precision,
+        "recall": recall,
+        "probs": all_probs,
+        "preds": all_preds,
+        "labels": all_labels
+    }
 
 
 def test_model(model, loader, device):
@@ -268,9 +269,9 @@ def test_model(model, loader, device):
     all_labels = []
 
     with torch.no_grad():
-        for X, y in loader:
-            X, y = X.to(device), y.to(device)
-            logits = model(X)
+        for X, global_feats, y in loader:
+            X, global_feats, y = X.to(device), global_feats.to(device), y.to(device)
+            logits = model(X, global_feats)
             preds = logits.argmax(dim=1)
             all_preds.extend(preds.cpu().numpy())
             all_labels.extend(y.cpu().numpy())
@@ -298,7 +299,6 @@ def test_model(model, loader, device):
     plt.xlabel("Predicted Label")
     plt.tight_layout()
     plt.show()
-    plt.savefig(f"data/images/cnn_confusion_matrix.png")
 
     with open("test_results.txt", "w") as f:
         f.write(f"Accuracy: {acc:.4f}\nPrecision: {precision:.4f}\nRecall: {recall:.4f}\nF1: {f1:.4f}\n")
