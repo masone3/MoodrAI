@@ -11,6 +11,7 @@ import random
 from typing import List, Tuple, Optional
 
 import numpy as np
+import librosa
 from collections import Counter
 import torch
 import torch.nn as nn
@@ -100,37 +101,58 @@ class MusicMoodCNN(nn.Module):
 # ---------------------------
 class SpectrogramDataset(Dataset):
     """
-    Dataset of mel spectrogram tensors and labels.
+    Dataset of mel spectrogram tensors, optional global features, and labels.
+    Automatically handles feature normalization and optional augmentation.
     """
-    def __init__(self, file_label_pairs: List[Tuple[str, int]], sr: int = 22050, n_mels: int = 128, duration: float = 30.0, normalize: bool = True):
+    def __init__(
+        self,
+        file_label_pairs: List[Tuple[str, int]],
+        sr: int = 22050,
+        n_mels: int = 128,
+        duration: float = 30.0,
+        normalize: bool = True,
+        use_global_feats: bool = True,
+        augment: bool = False
+    ):
         self.items = file_label_pairs
         self.sr = sr
         self.n_mels = n_mels
         self.duration = duration
         self.normalize = normalize
+        self.use_global_feats = use_global_feats
+        self.augment = augment
 
     def __len__(self):
         return len(self.items)
 
     def __getitem__(self, idx):
         audio_path, label = self.items[idx]
-        S_dB = extract_mel_spectrogram(audio_path, sr=self.sr, n_mels=self.n_mels, duration=self.duration)
 
-        # Normalize spectrogram
+        # --- Load waveform ---
+        y, sr = librosa.load(audio_path, sr=self.sr, duration=self.duration)
+
+        # --- Optional augmentation ---
+        if self.augment:
+            y = augment_audio(y, sr)
+
+        # --- Extract mel spectrogram ---
+        S_dB = extract_mel_spectrogram(audio_path, sr=self.sr, n_mels=self.n_mels, duration=self.duration)
         S_dB = np.nan_to_num(S_dB)
         if self.normalize:
             S_dB = (S_dB - S_dB.mean()) / (S_dB.std() + 1e-6)
 
-        # Convert to tensor
-        S_tensor = torch.tensor(S_dB, dtype=torch.float32).unsqueeze(0)
+        # --- Optional global features ---
+        if self.use_global_feats:
+            global_feats = extract_audio_stats(y, int(sr))  # ✅ works with new flexible version
+            gf_tensor = torch.tensor(global_feats, dtype=torch.float32)
+        else:
+            gf_tensor = torch.zeros(4, dtype=torch.float32)  # placeholder for compatibility
 
-        # Global features
-        global_feats = extract_audio_stats(audio_path)
-        #print(f"[DEBUG] {audio_path} | global_feats shape: {global_feats.shape} | values: {global_feats}")
+        # --- Convert to tensors ---
+        S_tensor = torch.tensor(S_dB, dtype=torch.float32).unsqueeze(0)  # [1, n_mels, time]
+        label_tensor = torch.tensor(int(label), dtype=torch.long)
 
-        global_feats_tensor = torch.tensor(global_feats, dtype=torch.float32)
-
-        return S_tensor, global_feats_tensor, torch.tensor(label, dtype=torch.long)
+        return S_tensor, gf_tensor, label_tensor
 
 
 # ---------------------------
@@ -262,6 +284,17 @@ def evaluate_cnn_calibration(model, dataloader, device, title="CNN Calibration")
         "labels": all_labels
     }
 
+def augment_audio(y, sr):
+        """Apply light random audio augmentations for data balancing."""
+        if random.random() < 0.5:
+            y = librosa.effects.pitch_shift(y=y, sr=int(sr), n_steps=random.choice([-1, 1]))
+        if random.random() < 0.5:
+            rate = random.uniform(0.9, 1.1)
+            y = librosa.effects.time_stretch(y=y, rate=rate)
+        if random.random() < 0.3:
+            noise = np.random.normal(0, 0.005, len(y))
+            y = y + noise
+        return y
 
 def test_model(model, loader, device):
     model.eval()
@@ -404,7 +437,7 @@ def main():
     val_loader = DataLoader(val_set, batch_size=args.batch_size, shuffle=False)
     test_loader = DataLoader(test_set, batch_size=args.batch_size, shuffle=False)
 
-    model = MusicMoodCNN(num_classes=2)
+    model = MusicMoodCNN(num_classes=2, global_feat_dim=4)
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     print(f"Using {device}. Train: {n_train}, Val: {n_val}, Test: {n_test}")

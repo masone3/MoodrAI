@@ -3,28 +3,28 @@
 import librosa
 import numpy as np
 
-def extract_audio_stats(audio_path, sr=22050):
+def extract_audio_stats(y_or_path, sr=22050):
     try:
-        y, sr = librosa.load(audio_path, sr=sr)
+        if isinstance(y_or_path, str):
+            y, sr = librosa.load(y_or_path, sr=sr)
+        else:
+            y = y_or_path
 
-        # Root mean square (energy)
-        rms = float(librosa.feature.rms(y=y).mean())
+        # Ensure y is not empty
+        if y.size == 0:
+            raise ValueError("Empty audio input")
 
-        # Tempo estimation
+        rms_vals = librosa.feature.rms(y=y)
+        rms = float(np.mean(rms_vals))
+        dyn_range = float(np.std(rms_vals))
+
         tempo, _ = librosa.beat.beat_track(y=y, sr=sr)
-        tempo = float(tempo)
-
-        # Spectral flux
         onset_env = librosa.onset.onset_strength(y=y, sr=sr)
-        flux = float(np.mean(np.diff(onset_env))) if len(onset_env) > 1 else 0.0
+        flux = float(np.mean(np.diff(onset_env))) if onset_env.size > 1 else 0.0
 
-        # Dynamic range
-        dyn_range = float(np.std(librosa.feature.rms(y=y)))
+        arr = np.array([rms, float(tempo), flux, dyn_range], dtype=np.float32)
+        return np.nan_to_num(arr)
 
-        arr = np.array([rms, tempo, flux, dyn_range], dtype=np.float32)
-        if not np.isfinite(arr).all():
-            arr = np.nan_to_num(arr, nan=0.0)
-        return arr
     except Exception as e:
-        print(f"⚠️ Error extracting global features for {audio_path}: {e}")
+        print(f"⚠️ Error extracting audio stats: {e}")
         return np.zeros(4, dtype=np.float32)
