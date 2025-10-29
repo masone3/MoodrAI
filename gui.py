@@ -11,14 +11,14 @@ import tkinter as tk
 from tkinter import filedialog, messagebox, ttk
 import torch
 import pandas as pd
+import numpy as np
 import os
 import pickle
 
 from codebase.features import extract_features
 from codebase.features_extra import extract_audio_stats
+from codebase.cnn_model import MusicMoodCNN, extract_mel_spectrogram
 
-from sklearn.preprocessing import StandardScaler
-from sklearn.linear_model import LogisticRegression
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 
@@ -111,7 +111,7 @@ class MusicMoodGUI:
         # -------------------------------
         # Model selection dropdown
         # -------------------------------
-        self.model_type_var = tk.StringVar(value="scikit")
+        self.model_type_var = tk.StringVar(value="logreg")
         model_label = ttk.Label(self.root, text="Select Model Type:")
         model_label.configure(background=root_bg, foreground=light_grey)
         model_label.pack(pady=5)
@@ -119,7 +119,7 @@ class MusicMoodGUI:
         self.model_selector = ttk.Combobox(
             self.root,
             textvariable=self.model_type_var,
-            values=["scikit", "cnn"],
+            values=["logreg", "svm", "rf", "cnn"],
             state="readonly"
         )
         self.model_selector.pack(pady=5)
@@ -151,7 +151,7 @@ class MusicMoodGUI:
         self.output_box.pack(pady=10)
 
         # -------------------------------
-        # Load initial models (default: Scikit)
+        # Load initial models (default: Logreg)
         # -------------------------------
         self.apply_model_selection()
 
@@ -177,25 +177,19 @@ class MusicMoodGUI:
         self.model_type = self.model_type_var.get()
         print(f"🔄 Switching to model type: {self.model_type}")
 
-        if self.model_type == "scikit":
-            try:
-                with open("models/valence_model.pkl", "rb") as f:
-                    self.valence_model = pickle.load(f)
-                with open("models/valence_scaler.pkl", "rb") as f:
-                    self.valence_scaler = pickle.load(f)
-                with open("models/arousal_model.pkl", "rb") as f:
-                    self.arousal_model = pickle.load(f)
-                with open("models/arousal_scaler.pkl", "rb") as f:
-                    self.arousal_scaler = pickle.load(f)
-                print("✅ Scikit-learn models and scalers loaded successfully.")
-            except Exception as e:
-                messagebox.showerror("Error", f"Could not load Scikit-learn models: {e}")
+        if self.model_type in ["logreg", "svm", "rf"]:
+            with open(f"models/{self.model_type}_valence_model.pkl", "rb") as f:
+                self.valence_model = pickle.load(f)
+            with open(f"models/{self.model_type}_valence_scaler.pkl", "rb") as f:
+                self.valence_scaler = pickle.load(f)
+            with open(f"models/{self.model_type}_arousal_model.pkl", "rb") as f:
+                self.arousal_model = pickle.load(f)
+            with open(f"models/{self.model_type}_arousal_scaler.pkl", "rb") as f:
+                self.arousal_scaler = pickle.load(f)
+            print(f"✅ Loaded {self.model_type.upper()} models and scalers successfully.")
 
         elif self.model_type == "cnn":
             try:
-                import torch
-                from codebase.cnn_model import MusicMoodCNN, extract_mel_spectrogram
-
                 self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
                 # Load valence and arousal CNNs
@@ -234,7 +228,7 @@ class MusicMoodGUI:
         model_type = self.model_type_var.get()
 
         try:
-            if model_type == "scikit":
+            if model_type in ["logreg", "svm", "rf"]:
                 # ----------------------------
                 # SCIKIT-LEARN PATH
                 # ----------------------------
@@ -244,10 +238,10 @@ class MusicMoodGUI:
                 df = pd.DataFrame([feats]).reindex(columns=self.feature_cols, fill_value=0)
 
                 X_scaled_val = self.valence_scaler.transform(df.values)
-                valence_prob = self.valence_model.predict_proba(X_scaled_val)[0][1]
+                valence_prob = self.valence_model.predict_proba(X_scaled_val)[0][1] # type: ignore
 
                 X_scaled_ar = self.arousal_scaler.transform(df.values)
-                arousal_prob = self.arousal_model.predict_proba(X_scaled_ar)[0][1]
+                arousal_prob = self.arousal_model.predict_proba(X_scaled_ar)[0][1] # type: ignore
 
             elif model_type == "cnn":
                 # ----------------------------
@@ -255,34 +249,34 @@ class MusicMoodGUI:
                 # ----------------------------
                 assert hasattr(self.valence_model, "forward"), "Expected CNN model, got Scikit"
 
-                # Prepare inputs
+                # --- Extract Mel Spectrogram ---
                 S_val = self.extract_mel_spectrogram(self.filepath)
+                S_val = np.nan_to_num(S_val)
                 S_val = (S_val - S_val.mean()) / (S_val.std() + 1e-6)
                 S_val = torch.tensor(S_val, dtype=torch.float32).unsqueeze(0).unsqueeze(0).to(self.device)
 
+                # --- Extract global features ---
                 global_feats = extract_audio_stats(self.filepath)
+                global_feats = np.nan_to_num(global_feats)
                 global_feats = torch.tensor(global_feats, dtype=torch.float32).unsqueeze(0).to(self.device)
 
                 with torch.no_grad():
+                    # Forward pass through both CNNs (valence and arousal)
                     valence_logits = self.valence_model(S_val, global_feats)
                     arousal_logits = self.arousal_model(S_val, global_feats)
-                    valence_prob = torch.softmax(valence_logits, dim=1)[0, 1].item()
-                    arousal_prob = torch.softmax(arousal_logits, dim=1)[0, 1].item()
 
-                """
-                    valence_logits = self.valence_model(S_val)
-                    arousal_logits = self.arousal_model(S_val)
-
+                    # Softmax to convert to probabilities
                     valence_softmax = torch.softmax(valence_logits, dim=1)
                     arousal_softmax = torch.softmax(arousal_logits, dim=1)
 
                     valence_prob = valence_softmax[0, 1].item()
                     arousal_prob = arousal_softmax[0, 1].item()
 
+                # --- Debug prints ---
                 print("DEBUG — raw logits:", valence_logits.cpu().numpy(), arousal_logits.cpu().numpy())
                 print("DEBUG — softmax:", valence_softmax.cpu().numpy(), arousal_softmax.cpu().numpy())
                 print("DEBUG — probs:", valence_prob, arousal_prob)
-                """
+
 
                     
 
@@ -293,6 +287,9 @@ class MusicMoodGUI:
             self.output_box.insert(tk.END, f"File: {os.path.basename(self.filepath)}\n\n")
             self.output_box.insert(tk.END, f"Valence (0=Low, 1=High): {valence_prob:.2f}\n")
             self.output_box.insert(tk.END, f"Arousal (0=Low, 1=High): {arousal_prob:.2f}\n")
+
+            with open("prediction_history.csv", "a") as log:
+                log.write(f"{os.path.basename(self.filepath)},{model_type},{valence_prob:.3f},{arousal_prob:.3f}\n")
 
             valence_scaled = (valence_prob * 2) - 1
             arousal_scaled = (arousal_prob * 2) - 1

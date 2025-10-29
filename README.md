@@ -51,6 +51,12 @@ The system is organized into modular components for data loading, feature extrac
 
 For more information on the design: [design link](design.md)
 
+## Test Plan
+
+This testing plan outlines how Moodr AI’s data processing, CNN model training, and GUI functionality are validated for accuracy and stability. It includes key test cases covering dataset integrity, feature extraction, model performance, and end-to-end predictions through the user interface. Each test ensures that the system reliably classifies songs along the valence–arousal spectrum and provides clear visual and textual outputs to the user.
+
+For more information on the design: [test plan link](test.plan.md)
+
 ## Built With
 
 - [Librosa](https://librosa.org/): Python package for music and audio analysis.  

@@ -1,0 +1,28 @@
+Drowning Pool - Bodies (Official HD Music Video).mp3,logreg,0.771,0.787
+Drowning Pool - Bodies (Official HD Music Video).mp3,svm,0.830,0.897
+Drowning Pool - Bodies (Official HD Music Video).mp3,rf,0.900,0.950
+Drowning Pool - Bodies (Official HD Music Video).mp3,cnn,0.547,0.321
+Megadeth - Holy Wars...The Punishment Due.mp3,cnn,0.581,0.571
+Megadeth - Holy Wars...The Punishment Due.mp3,rf,0.870,0.920
+Megadeth - Holy Wars...The Punishment Due.mp3,svm,0.792,0.893
+Megadeth - Holy Wars...The Punishment Due.mp3,logreg,0.878,0.905
+Megadeth - Holy Wars...The Punishment Due.mp3,cnn,0.581,0.571
+System Of A Down - B.Y.O.B. (Official HD Video).mp3,cnn,0.662,0.744
+System Of A Down - B.Y.O.B. (Official HD Video).mp3,logreg,0.798,0.926
+System Of A Down - B.Y.O.B. (Official HD Video).mp3,svm,0.824,0.895
+System Of A Down - B.Y.O.B. (Official HD Video).mp3,rf,0.790,0.960
+Somewhere over the Rainbow - Israel _IZ_ Kamakawiwoole.mp3,cnn,0.352,0.519
+Louis Armstrong - What A Wonderful World.mp3,cnn,0.370,0.257
+Rage Against The Machine - Killing In the Name (Official HD Video).mp3,cnn,0.723,0.707
+Rage Against The Machine - Killing In the Name (Official HD Video).mp3,rf,0.750,0.910
+Rage Against The Machine - Killing In the Name (Official HD Video).mp3,svm,0.703,0.804
+Rage Against The Machine - Killing In the Name (Official HD Video).mp3,logreg,0.707,0.792
+Rage Against The Machine - Killing In the Name (Official HD Video).mp3,cnn,0.723,0.707
+One Step Closer [Official HD Music Video] - Linkin Park.mp3,cnn,0.575,0.588
+One Step Closer [Official HD Music Video] - Linkin Park.mp3,rf,0.790,0.900
+One Step Closer [Official HD Music Video] - Linkin Park.mp3,svm,0.752,0.884
+One Step Closer [Official HD Music Video] - Linkin Park.mp3,logreg,0.785,0.846
+Eric Clapton - Tears In Heaven (Official Video).mp3,cnn,0.149,0.178
+Eric Clapton - Tears In Heaven (Official Video).mp3,rf,0.130,0.090
+Eric Clapton - Tears In Heaven (Official Video).mp3,svm,0.133,0.094
+Eric Clapton - Tears In Heaven (Official Video).mp3,logreg,0.141,0.080
