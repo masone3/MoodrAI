@@ -26,3 +26,12 @@ Eric Clapton - Tears In Heaven (Official Video).mp3,cnn,0.149,0.178
 Eric Clapton - Tears In Heaven (Official Video).mp3,rf,0.130,0.090
 Eric Clapton - Tears In Heaven (Official Video).mp3,svm,0.133,0.094
 Eric Clapton - Tears In Heaven (Official Video).mp3,logreg,0.141,0.080
+Somewhere over the Rainbow - Israel _IZ_ Kamakawiwoole.mp3,cnn,0.493,0.378
+Megadeth - Holy Wars...The Punishment Due.mp3,cnn,0.475,0.590
+Drowning Pool - Bodies (Official HD Music Video).mp3,cnn,0.484,0.444
+System Of A Down - B.Y.O.B. (Official HD Video).mp3,cnn,0.634,0.607
+Rage Against The Machine - Killing In the Name (Official HD Video).mp3,cnn,0.678,0.697
+Rage Against The Machine - Killing In the Name (Official HD Video).mp3,svm,0.703,0.804
+Rage Against The Machine - Killing In the Name (Official HD Video).mp3,logreg,0.707,0.792
+Rage Against The Machine - Killing In the Name (Official HD Video).mp3,rf,0.750,0.910
+Rage Against The Machine - Killing In the Name (Official HD Video).mp3,cnn,0.678,0.697

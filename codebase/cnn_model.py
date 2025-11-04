@@ -133,7 +133,7 @@ class SpectrogramDataset(Dataset):
 
         # --- Optional augmentation ---
         if self.augment:
-            y = augment_audio(y, sr)
+            y = augment_audio(y, sr, label=label)
 
         # --- Extract mel spectrogram ---
         S_dB = extract_mel_spectrogram(audio_path, sr=self.sr, n_mels=self.n_mels, duration=self.duration)
@@ -284,17 +284,24 @@ def evaluate_cnn_calibration(model, dataloader, device, title="CNN Calibration")
         "labels": all_labels
     }
 
-def augment_audio(y, sr):
-        """Apply light random audio augmentations for data balancing."""
+def augment_audio(y, sr, label=None):
+    """Light random audio augmentation — biased by label balance."""
+    base_prob = 0.3  # base chance for all samples
+    boost_prob = 0.7 if label in [0] else 0.3  # boost for underrepresented classes
+
+    if random.random() < boost_prob:
         if random.random() < 0.5:
-            y = librosa.effects.pitch_shift(y=y, sr=int(sr), n_steps=random.choice([-1, 1]))
+            y = librosa.effects.pitch_shift(y, sr=sr, n_steps=random.choice([-2, -1, 1, 2]))
         if random.random() < 0.5:
             rate = random.uniform(0.9, 1.1)
-            y = librosa.effects.time_stretch(y=y, rate=rate)
+            y = librosa.effects.time_stretch(y, rate=rate)
         if random.random() < 0.3:
             noise = np.random.normal(0, 0.005, len(y))
             y = y + noise
-        return y
+        
+    # Normalize to prevent clipping
+    y = y / np.max(np.abs(y) + 1e-6)
+    return y
 
 def test_model(model, loader, device):
     model.eval()
@@ -420,34 +427,72 @@ def parse_args():
 def main():
     args = parse_args()
 
+    # --- Reproducibility ---
     random.seed(args.seed)
     np.random.seed(args.seed)
     torch.manual_seed(args.seed)
 
-    file_label_pairs = build_file_label_list_from_annotations(args.annotations, args.audio_dir, args.label)
-    dataset = SpectrogramDataset(file_label_pairs)
+    # --- Load file-label pairs ---
+    file_label_pairs = build_file_label_list_from_annotations(
+        args.annotations,
+        args.audio_dir,
+        args.label
+    )
 
-    n_total = len(dataset)
+    # --- Full dataset (no augmentation here yet) ---
+    full_dataset = SpectrogramDataset(file_label_pairs, augment=False)
+
+    # --- Dataset split ---
+    n_total = len(full_dataset)
     n_val = int(n_total * args.val_split)
     n_test = int(n_total * args.test_split)
     n_train = n_total - n_val - n_test
 
-    train_set, val_set, test_set = random_split(dataset, [n_train, n_val, n_test])
-    train_loader = DataLoader(train_set, batch_size=args.batch_size, shuffle=True)
-    val_loader = DataLoader(val_set, batch_size=args.batch_size, shuffle=False)
-    test_loader = DataLoader(test_set, batch_size=args.batch_size, shuffle=False)
+    print(f"Total samples: {n_total} → Train: {n_train}, Val: {n_val}, Test: {n_test}")
 
+    train_set, val_set, test_set = random_split(
+        full_dataset,
+        [n_train, n_val, n_test],
+        generator=torch.Generator().manual_seed(args.seed)
+    )
+
+    # --- Enable augmentation for the training set only ---
+    # We replace the dataset object inside the Subset with an augmented one
+    train_items = [full_dataset.items[i] for i in train_set.indices]
+    val_items = [full_dataset.items[i] for i in val_set.indices]
+    test_items = [full_dataset.items[i] for i in test_set.indices]
+
+    train_dataset = SpectrogramDataset(train_items, augment=True)   # ✅ augmentation ON
+    val_dataset = SpectrogramDataset(val_items, augment=False)
+    test_dataset = SpectrogramDataset(test_items, augment=False)
+
+    # --- DataLoaders ---
+    train_loader = DataLoader(train_dataset, batch_size=args.batch_size, shuffle=True)
+    val_loader = DataLoader(val_dataset, batch_size=args.batch_size, shuffle=False)
+    test_loader = DataLoader(test_dataset, batch_size=args.batch_size, shuffle=False)
+
+    # --- Model setup ---
     model = MusicMoodCNN(num_classes=2, global_feat_dim=4)
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    print(f"\nUsing device: {device}")
 
-    print(f"Using {device}. Train: {n_train}, Val: {n_val}, Test: {n_test}")
-    model = train(model, train_loader, val_loader, epochs=args.epochs, lr=args.lr, device=device, save_path=args.save_model)
+    # --- Training ---
+    model = train(
+        model,
+        train_loader,
+        val_loader,
+        epochs=args.epochs,
+        lr=args.lr,
+        device=device,
+        save_path=args.save_model
+    )
 
-    # Load best model for testing
+    # --- Load best saved model ---
     if os.path.exists(args.save_model):
-        model.load_state_dict(torch.load(args.save_model))
-        print(f"✅ Loaded best saved model: {args.save_model}")
+        model.load_state_dict(torch.load(args.save_model, map_location=device))
+        print(f"\n✅ Loaded best saved model: {args.save_model}")
 
+    # --- Final testing ---
     test_model(model, test_loader, device)
 
 

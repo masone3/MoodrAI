@@ -10,7 +10,7 @@ import numpy as np
 import torch
 import pandas as pd
 import pickle
-from torch.utils.data import DataLoader, random_split
+from torch.utils.data import DataLoader, random_split, Subset
 
 from codebase.data_loader import load_deam_annotations, add_binary_labels
 from codebase.features import extract_features
@@ -24,18 +24,28 @@ from codebase.cnn_model import (
 )
 
 # -----------------------------------------------------------
-# CNN training helper
+# CNN training helper (augmentation only on train split)
 # -----------------------------------------------------------
 def train_cnn_model(annotations_path, audio_dir, label_type, save_path, epochs=10, batch_size=16, lr=1e-3):
     print(f"\n🎧 Starting CNN training for {label_type}...\n")
 
     file_label_pairs = build_file_label_list_from_annotations(annotations_path, audio_dir, label_col=label_type)
-    dataset = SpectrogramDataset(file_label_pairs)
+    full_dataset = SpectrogramDataset(file_label_pairs, augment=False)
 
-    n_total = len(dataset)
+    n_total = len(full_dataset)
     n_val = int(0.15 * n_total)
     n_train = n_total - n_val
-    train_ds, val_ds = random_split(dataset, [n_train, n_val])
+
+    # reproducible split
+    generator = torch.Generator().manual_seed(42)   # or pass seed into function
+    train_subset, val_subset = random_split(full_dataset, [n_train, n_val], generator=generator)
+
+    # Rebuild datasets with augmentation ON for training subset only
+    train_items = [full_dataset.items[i] for i in train_subset.indices]
+    val_items = [full_dataset.items[i] for i in val_subset.indices]
+
+    train_ds = SpectrogramDataset(train_items, augment=True)
+    val_ds = SpectrogramDataset(val_items, augment=False)
 
     train_loader = DataLoader(train_ds, batch_size=batch_size, shuffle=True, num_workers=2)
     val_loader = DataLoader(val_ds, batch_size=batch_size, shuffle=False, num_workers=2)
@@ -45,6 +55,7 @@ def train_cnn_model(annotations_path, audio_dir, label_type, save_path, epochs=1
     trained_model = train(model, train_loader, val_loader, epochs=epochs, lr=lr, device=device, save_path=save_path)
 
     print(f"✅ Training for {label_type} complete. Model saved to: {save_path}\n")
+
 
 
 # -----------------------------------------------------------
@@ -123,7 +134,6 @@ def main():
         def train_and_save(model_type):
             print(f"\n🚀 Training {model_type.upper()} models...\n")
 
-            # Map shorthand to the full model_type expected by train_baseline_model
             model_map = {
                 "logreg": "logreg",
                 "svm": "svm",
@@ -153,13 +163,11 @@ def main():
                 save_plots_dir=plottedgraphs
             )
 
-            # Save models
             with open(f"models/{model_type}_valence_model.pkl", "wb") as f:
                 pickle.dump(valence_model, f)
             with open(f"models/{model_type}_arousal_model.pkl", "wb") as f:
                 pickle.dump(arousal_model, f)
 
-            # Only save scalers if they exist (Random Forest doesn’t need scalers)
             if valence_scaler is not None:
                 with open(f"models/{model_type}_valence_scaler.pkl", "wb") as f:
                     pickle.dump(valence_scaler, f)
@@ -168,8 +176,6 @@ def main():
                     pickle.dump(arousal_scaler, f)
 
             print(f"✅ Saved {model_type.upper()} models{' + scalers' if valence_scaler else ''}")
-
-            print(f"✅ Saved {model_type.upper()} models and scalers")
 
         if args.model_type in ["logreg", "all"]:
             train_and_save("logreg")
@@ -197,12 +203,12 @@ def main():
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         for label_type, model_path in [("valence", "models/cnn_valence_model.pth"), ("arousal", "models/cnn_arousal_model.pth")]:
             pairs = build_file_label_list_from_annotations(args.annotations, args.audio_dir, label_col=f"{label_type}_label")
-            cnn_dataset = SpectrogramDataset(pairs)
+            cnn_dataset = SpectrogramDataset(pairs, augment=False)
 
-            train_size = int(0.8 * len(dataset))
-            val_size = int(0.1 * len(dataset))
-            test_size = len(dataset) - train_size - val_size  # ensures total matches
-            _, _, test_set = random_split(cnn_dataset, [train_size, val_size, test_size])
+            train_size = int(0.8 * len(cnn_dataset))
+            val_size = int(0.1 * len(cnn_dataset))
+            test_size = len(cnn_dataset) - train_size - val_size
+            _, _, test_set = random_split(cnn_dataset, [train_size, val_size, test_size], generator=torch.Generator().manual_seed(42))
             test_loader = DataLoader(test_set, batch_size=8, shuffle=False)
 
             model = MusicMoodCNN(num_classes=2)
