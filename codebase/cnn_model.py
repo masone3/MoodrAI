@@ -15,7 +15,7 @@ import librosa
 from collections import Counter
 import torch
 import torch.nn as nn
-from torch.utils.data import Dataset, DataLoader, random_split
+from torch.utils.data import Dataset, DataLoader, random_split, WeightedRandomSampler
 import matplotlib.pyplot as plt
 import seaborn as sns
 
@@ -109,7 +109,6 @@ class SpectrogramDataset(Dataset):
         file_label_pairs: List[Tuple[str, int]],
         sr: int = 22050,
         n_mels: int = 128,
-        duration: float = 30.0,
         normalize: bool = True,
         use_global_feats: bool = True,
         augment: bool = False
@@ -117,7 +116,6 @@ class SpectrogramDataset(Dataset):
         self.items = file_label_pairs
         self.sr = sr
         self.n_mels = n_mels
-        self.duration = duration
         self.normalize = normalize
         self.use_global_feats = use_global_feats
         self.augment = augment
@@ -129,14 +127,14 @@ class SpectrogramDataset(Dataset):
         audio_path, label = self.items[idx]
 
         # --- Load waveform ---
-        y, sr = librosa.load(audio_path, sr=self.sr, duration=self.duration)
+        y, sr = librosa.load(audio_path, sr=self.sr)
 
         # --- Optional augmentation ---
         if self.augment:
             y = augment_audio(y, sr, label=label)
 
         # --- Extract mel spectrogram ---
-        S_dB = extract_mel_spectrogram(audio_path, sr=self.sr, n_mels=self.n_mels, duration=self.duration)
+        S_dB = extract_mel_spectrogram(audio_path, sr=self.sr, n_mels=self.n_mels)
         S_dB = np.nan_to_num(S_dB)
         if self.normalize:
             S_dB = (S_dB - S_dB.mean()) / (S_dB.std() + 1e-6)

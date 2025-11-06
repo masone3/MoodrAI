@@ -10,7 +10,7 @@ import numpy as np
 import torch
 import pandas as pd
 import pickle
-from torch.utils.data import DataLoader, random_split, Subset
+from torch.utils.data import DataLoader, random_split, Subset, WeightedRandomSampler
 
 from codebase.data_loader import load_deam_annotations, add_binary_labels
 from codebase.features import extract_features
@@ -27,34 +27,61 @@ from codebase.cnn_model import (
 # CNN training helper (augmentation only on train split)
 # -----------------------------------------------------------
 def train_cnn_model(annotations_path, audio_dir, label_type, save_path, epochs=10, batch_size=16, lr=1e-3):
+    """Train CNN for given label type (valence or arousal)."""
     print(f"\n🎧 Starting CNN training for {label_type}...\n")
 
+    # Build dataset
     file_label_pairs = build_file_label_list_from_annotations(annotations_path, audio_dir, label_col=label_type)
-    full_dataset = SpectrogramDataset(file_label_pairs, augment=False)
+    dataset = SpectrogramDataset(file_label_pairs)
 
-    n_total = len(full_dataset)
+    # Split train/val
+    n_total = len(dataset)
     n_val = int(0.15 * n_total)
     n_train = n_total - n_val
+    train_ds, val_ds = random_split(
+        dataset, [n_train, n_val],
+        generator=torch.Generator().manual_seed(42)
+    )
 
-    # reproducible split
-    generator = torch.Generator().manual_seed(42)   # or pass seed into function
-    train_subset, val_subset = random_split(full_dataset, [n_train, n_val], generator=generator)
+    # -------------------------------
+    # ✅ Balanced batch sampling
+    # -------------------------------
+    # Compute sample weights as before
+    labels = [dataset.items[i][1] for i in train_ds.indices]
+    class_sample_counts = np.bincount(labels)
+    class_weights = 1. / (class_sample_counts + 1e-6)
+    sample_weights = np.array([class_weights[label] for label in labels])
 
-    # Rebuild datasets with augmentation ON for training subset only
-    train_items = [full_dataset.items[i] for i in train_subset.indices]
-    val_items = [full_dataset.items[i] for i in val_subset.indices]
+    # ✅ Convert to a list or torch tensor before passing to sampler
+    sample_weights = torch.DoubleTensor(sample_weights)  # or list(sample_weights)
+    sampler = WeightedRandomSampler(weights=sample_weights, num_samples=len(sample_weights), replacement=True) # type: ignore
 
-    train_ds = SpectrogramDataset(train_items, augment=True)
-    val_ds = SpectrogramDataset(val_items, augment=False)
-
-    train_loader = DataLoader(train_ds, batch_size=batch_size, shuffle=True, num_workers=2)
+    # Data loaders (balanced sampler for training)
+    train_loader = DataLoader(train_ds, batch_size=batch_size, sampler=sampler, num_workers=2)
     val_loader = DataLoader(val_ds, batch_size=batch_size, shuffle=False, num_workers=2)
+    """
+    # --- Debugging: Check sampling balance ---
+    print("\n🔍 Checking class balance in one sampled epoch...")
+    label_counts = {0: 0, 1: 0}
+    for _, _, y in train_loader:
+        labels = y.cpu().numpy()
+        for lbl in labels:
+            label_counts[int(lbl)] += 1
 
+    print(f"Sampled label distribution (from sampler): {label_counts}")
+    total = sum(label_counts.values())
+    for k, v in label_counts.items():
+        print(f"  Class {k}: {v} ({v/total:.2%})")
+    """
+
+    # Initialize model + training setup
     model = MusicMoodCNN(num_classes=2)
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+    # Train
     trained_model = train(model, train_loader, val_loader, epochs=epochs, lr=lr, device=device, save_path=save_path)
 
-    print(f"✅ Training for {label_type} complete. Model saved to: {save_path}\n")
+    print(f"\n✅ Training for {label_type} complete. Model saved to: {save_path}\n")
 
 
 
@@ -203,7 +230,8 @@ def main():
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         for label_type, model_path in [("valence", "models/cnn_valence_model.pth"), ("arousal", "models/cnn_arousal_model.pth")]:
             pairs = build_file_label_list_from_annotations(args.annotations, args.audio_dir, label_col=f"{label_type}_label")
-            cnn_dataset = SpectrogramDataset(pairs, augment=False)
+            cnn_dataset = SpectrogramDataset(pairs)
+            cnn_dataset.augment = False
 
             train_size = int(0.8 * len(cnn_dataset))
             val_size = int(0.1 * len(cnn_dataset))

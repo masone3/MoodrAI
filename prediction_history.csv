@@ -35,3 +35,67 @@ Rage Against The Machine - Killing In the Name (Official HD Video).mp3,svm,0.703
 Rage Against The Machine - Killing In the Name (Official HD Video).mp3,logreg,0.707,0.792
 Rage Against The Machine - Killing In the Name (Official HD Video).mp3,rf,0.750,0.910
 Rage Against The Machine - Killing In the Name (Official HD Video).mp3,cnn,0.678,0.697
+Queen - Don't Stop Me Now (Official Video).mp3,cnn,0.436,0.343
+Eric Clapton - Tears In Heaven (Official Video).mp3,cnn,0.273,0.118
+Radiohead - Creep.mp3,cnn,0.610,0.649
+Alice In Chains - Nutshell (Official Audio).mp3,cnn,0.198,0.179
+One Step Closer [Official HD Music Video] - Linkin Park.mp3,cnn,0.457,0.453
+Megadeth - Holy Wars...The Punishment Due.mp3,cnn,0.475,0.590
+Drowning Pool - Bodies (Official HD Music Video).mp3,cnn,0.484,0.444
+Megadeth - Holy Wars...The Punishment Due.mp3,cnn,0.475,0.590
+Louis Armstrong - What A Wonderful World.mp3,cnn,0.372,0.220
+Queen - Don't Stop Me Now (Official Video).mp3,cnn,0.436,0.343
+Somewhere over the Rainbow - Israel _IZ_ Kamakawiwoole.mp3,cnn,0.493,0.378
+System Of A Down - B.Y.O.B. (Official HD Video).mp3,cnn,0.634,0.607
+Megadeth - Holy Wars...The Punishment Due.mp3,cnn,0.475,0.590
+Drowning Pool - Bodies (Official HD Music Video).mp3,cnn,0.484,0.444
+Rage Against The Machine - Killing In the Name (Official HD Video).mp3,cnn,0.678,0.697
+One Step Closer [Official HD Music Video] - Linkin Park.mp3,cnn,0.457,0.453
+Megadeth - Holy Wars...The Punishment Due.mp3,cnn,0.475,0.590
+Drowning Pool - Bodies (Official HD Music Video).mp3,cnn,0.484,0.444
+Rage Against The Machine - Killing In the Name (Official HD Video).mp3,cnn,0.678,0.697
+Alice In Chains - Nutshell (Official Audio).mp3,cnn,0.198,0.179
+Louis Armstrong - What A Wonderful World.mp3,cnn,0.372,0.220
+Queen - Don't Stop Me Now (Official Video).mp3,cnn,0.436,0.343
+Numb (Official Music Video) [4K UPGRADE] – Linkin Park.mp3,cnn,0.410,0.376
+Radiohead - Creep.mp3,cnn,0.610,0.649
+Radiohead - Creep.mp3,logreg,0.413,0.523
+Radiohead - Creep.mp3,svm,0.439,0.682
+Radiohead - Creep.mp3,rf,0.340,0.560
+Pharrell Williams - Happy (Video).mp3,cnn,0.624,0.666
+Coldplay - Fix You (Official Video).mp3,cnn,0.287,0.186
+Megadeth - Holy Wars...The Punishment Due.mp3,cnn,0.475,0.590
+One Step Closer [Official HD Music Video] - Linkin Park.mp3,cnn,0.457,0.453
+Megadeth - Holy Wars...The Punishment Due.mp3,cnn,0.581,0.692
+System Of A Down - B.Y.O.B. (Official HD Video).mp3,cnn,0.743,0.800
+Somewhere over the Rainbow - Israel _IZ_ Kamakawiwoole.mp3,cnn,0.388,0.448
+Johnny Cash - Hurt.mp3,cnn,0.085,0.181
+Rage Against The Machine - Killing In the Name (Official HD Video).mp3,cnn,0.767,0.880
+One Step Closer [Official HD Music Video] - Linkin Park.mp3,cnn,0.397,0.519
+System Of A Down - B.Y.O.B. (Official HD Video).mp3,cnn,0.743,0.800
+System Of A Down - B.Y.O.B. (Official HD Video).mp3,cnn,0.743,0.800
+System Of A Down - B.Y.O.B. (Official HD Video).mp3,cnn,0.743,0.800
+Megadeth - Holy Wars...The Punishment Due.mp3,cnn,0.581,0.692
+Drowning Pool - Bodies (Official HD Music Video).mp3,cnn,0.563,0.484
+Queen - Don't Stop Me Now (Official Video).mp3,cnn,0.320,0.406
+Electric Light Orchestra - Mr. Blue Sky (Official Video).mp3,cnn,0.559,0.544
+One Step Closer [Official HD Music Video] - Linkin Park.mp3,cnn,0.397,0.519
+Daft Punk - Touch (Official Audio) ft. Paul Williams.mp3,cnn,0.005,0.034
+Louis Armstrong - What A Wonderful World.mp3,cnn,0.175,0.277
+Somewhere over the Rainbow - Israel _IZ_ Kamakawiwoole.mp3,cnn,0.388,0.448
+Electric Light Orchestra - Mr. Blue Sky (Official Video).mp3,cnn,0.559,0.544
+Johnny Cash - Hurt.mp3,cnn,0.085,0.181
+Eric Clapton - Tears In Heaven (Official Video).mp3,cnn,0.066,0.166
+Coldplay - Fix You (Official Video).mp3,cnn,0.078,0.161
+Numb (Official Music Video) [4K UPGRADE] – Linkin Park.mp3,cnn,0.352,0.405
+Radiohead - Creep.mp3,cnn,0.711,0.833
+Pharrell Williams - Happy (Video).mp3,cnn,0.643,0.843
+Metallica - Dyers Eve.mp3,cnn,0.803,0.896
+MESHUGGAH - Rational Gaze (OFFICIAL MUSIC VIDEO).mp3,cnn,0.780,0.778
+MESHUGGAH - Bleed (Official Music Video).mp3,cnn,0.641,0.579
+MESHUGGAH - Demiurge (Official Music Video).mp3,cnn,0.080,0.142
+MESHUGGAH - Demiurge (Official Music Video).mp3,logreg,0.543,0.467
+MESHUGGAH - Demiurge (Official Music Video).mp3,svm,0.384,0.434
+MESHUGGAH - Demiurge (Official Music Video).mp3,rf,0.420,0.460
+MESHUGGAH - Demiurge (Official Music Video).mp3,cnn,0.080,0.142
+Metallica - Dyers Eve.mp3,cnn,0.803,0.896
