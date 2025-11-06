@@ -134,6 +134,10 @@ class MusicMoodGUI:
         self.predict_btn = ttk.Button(self.root, text="Predict Mood", command=self.predict_mood, state=tk.DISABLED)
         self.predict_btn.pack(pady=5)
 
+        self.compare_btn = ttk.Button(self.root, text="Compare All Models", command=self.compare_all_models)
+        self.compare_btn.pack(pady=5)
+
+
         # -------------------------------
         # Output box
         # -------------------------------
@@ -297,6 +301,106 @@ class MusicMoodGUI:
 
         except Exception as e:
             messagebox.showerror("Prediction Error", f"Could not classify file: {e}")
+
+    def compare_all_models(self):
+        if not hasattr(self, "filepath"):
+            messagebox.showwarning("Warning", "Please select a file first.")
+            return
+
+        results = []
+        try:
+            # --- Extract shared features ---
+            feats = extract_features(self.filepath)
+            df = pd.DataFrame([feats]).reindex(columns=self.feature_cols, fill_value=0)
+
+            # --- Extract CNN features ---
+            S_val = self.extract_mel_spectrogram(self.filepath)
+            S_val = np.nan_to_num(S_val)
+            S_val = (S_val - S_val.mean()) / (S_val.std() + 1e-6)
+            S_val = torch.tensor(S_val, dtype=torch.float32).unsqueeze(0).unsqueeze(0)
+
+            global_feats = extract_audio_stats(self.filepath)
+            global_feats = torch.tensor(global_feats, dtype=torch.float32).unsqueeze(0)
+
+            device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+            S_val, global_feats = S_val.to(device), global_feats.to(device)
+
+            # --- Loop through model types ---
+            for model_type in ["logreg", "svm", "rf"]:
+                try:
+                    val_model = pickle.load(open(f"models/{model_type}_valence_model.pkl", "rb"))
+                    val_scaler = pickle.load(open(f"models/{model_type}_valence_scaler.pkl", "rb"))
+                    aro_model = pickle.load(open(f"models/{model_type}_arousal_model.pkl", "rb"))
+                    aro_scaler = pickle.load(open(f"models/{model_type}_arousal_scaler.pkl", "rb"))
+
+                    X_scaled_val = val_scaler.transform(df.values)
+                    valence_prob = val_model.predict_proba(X_scaled_val)[0][1]
+
+                    X_scaled_aro = aro_scaler.transform(df.values)
+                    arousal_prob = aro_model.predict_proba(X_scaled_aro)[0][1]
+
+                    results.append((model_type.upper(), valence_prob, arousal_prob))
+                except Exception as e:
+                    print(f"⚠️ Skipping {model_type}: {e}")
+
+            # --- CNN ---
+            cnn_valence = MusicMoodCNN(num_classes=2)
+            cnn_valence.load_state_dict(torch.load("models/cnn_valence_model.pth", map_location=device))
+            cnn_valence.eval()
+
+            cnn_arousal = MusicMoodCNN(num_classes=2)
+            cnn_arousal.load_state_dict(torch.load("models/cnn_arousal_model.pth", map_location=device))
+            cnn_arousal.eval()
+
+            with torch.no_grad():
+                v_logits = cnn_valence(S_val, global_feats)
+                a_logits = cnn_arousal(S_val, global_feats)
+                v_prob = torch.softmax(v_logits, dim=1)[0, 1].item()
+                a_prob = torch.softmax(a_logits, dim=1)[0, 1].item()
+
+            results.append(("CNN", v_prob, a_prob))
+
+            # --- Display results in GUI ---
+            self.output_box.delete("1.0", tk.END)
+            self.output_box.insert(tk.END, f"File: {os.path.basename(self.filepath)}\n\n")
+            self.output_box.insert(tk.END, f"{'Model':<10}{'Valence':<10}{'Arousal':<10}\n")
+            self.output_box.insert(tk.END, "-" * 35 + "\n")
+            for name, v, a in results:
+                self.output_box.insert(tk.END, f"{name:<10}{v:.2f}{' ' * 6}{a:.2f}\n")
+
+            # --- Optional: Plot comparison ---
+            self.show_model_comparison_plot(results)
+
+        except Exception as e:
+            messagebox.showerror("Comparison Error", f"Could not compare models: {e}")
+
+    def show_model_comparison_plot(self, results):
+        if self.canvas:
+            self.canvas.get_tk_widget().destroy()
+
+        models = [r[0] for r in results]
+        valences = [r[1] for r in results]
+        arousals = [r[2] for r in results]
+
+        fig, ax = plt.subplots(figsize=(5, 4))
+        x = np.arange(len(models))
+        width = 0.35
+
+        ax.bar(x - width/2, valences, width, label="Valence", color="#A678C0")
+        ax.bar(x + width/2, arousals, width, label="Arousal", color="#56AC8A")
+
+        ax.set_xticks(x)
+        ax.set_xticklabels(models)
+        ax.set_ylim(0, 1)
+        ax.set_ylabel("Predicted Probability")
+        ax.set_title("Model Comparison: Valence vs Arousal")
+        ax.legend()
+
+        self.figure = fig
+        self.canvas = FigureCanvasTkAgg(fig, master=self.root)
+        self.canvas.draw()
+        self.canvas.get_tk_widget().pack(pady=10)
+
 
 
     # ------------------------------------------------------
