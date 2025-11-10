@@ -57,8 +57,8 @@ def train_cnn_model(annotations_path, audio_dir, label_type, save_path, epochs=1
     sampler = WeightedRandomSampler(weights=sample_weights, num_samples=len(sample_weights), replacement=True) # type: ignore
 
     # Data loaders (balanced sampler for training)
-    train_loader = DataLoader(train_ds, batch_size=batch_size, sampler=sampler, num_workers=2)
-    val_loader = DataLoader(val_ds, batch_size=batch_size, shuffle=False, num_workers=2)
+    train_loader = DataLoader(train_ds, batch_size=batch_size, sampler=sampler, num_workers=0, persistent_workers=False)
+    val_loader = DataLoader(val_ds, batch_size=batch_size, shuffle=False, num_workers=0)
     """
     # --- Debugging: Check sampling balance ---
     print("\n🔍 Checking class balance in one sampled epoch...")

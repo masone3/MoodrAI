@@ -67,6 +67,7 @@ For more information on the design: [test plan link](test.plan.md)
 - [Numpy](https://numpy.org/) Also used for data handling, cleaning, and managing the annotation data.
 - [Pickle](https://docs.python.org/3/library/pickle.html) Used for storing and loading trained models.
 - [Matplotlib](https://matplotlib.org/) Used for displaying graphs and other results-related visuals.
+- [tqdm](https://tqdm.github.io/) Used for displaying progress bars for training and within the GUI for music classification.
 - VS Code: Primary IDE. 
 
 ## Author

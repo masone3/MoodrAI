@@ -8,7 +8,8 @@ Trains, validates, and tests a PyTorch CNN model on the DEAM dataset.
 import os
 import argparse
 import random
-from typing import List, Tuple, Optional
+from typing import List, Tuple
+from tqdm import tqdm, trange
 
 import numpy as np
 import librosa
@@ -160,13 +161,14 @@ def train_epoch(model, loader, optimizer, criterion, device):
     model.train()
     total_loss, correct, total = 0, 0, 0
 
+    progress_bar = tqdm(loader, desc="Training Batches", leave=False)
     for batch_idx, (X, global_feats, y) in enumerate(loader):
         if batch_idx % 10 == 0:  # print every 10 batches
             print(f"[Train Batch {batch_idx}] Processing batch size: {X.size(0)}")
 
         X, global_feats, y = X.to(device), global_feats.to(device), y.to(device)
 
-    for X, global_feats, y in loader:
+    for X, global_feats, y in progress_bar:
         X, global_feats, y = X.to(device), global_feats.to(device), y.to(device)
         optimizer.zero_grad()
         logits = model(X, global_feats)
@@ -177,6 +179,10 @@ def train_epoch(model, loader, optimizer, criterion, device):
         total_loss += loss.item() * X.size(0)
         correct += (logits.argmax(dim=1) == y).sum().item()
         total += X.size(0)
+
+        # Update progress bar dynamically
+        progress_bar.set_postfix(loss=loss.item())
+
     return total_loss / total, correct / total
 
 
@@ -368,7 +374,7 @@ def train(model, train_loader, val_loader, epochs=10, lr=1e-3, device=None, save
         criterion = nn.CrossEntropyLoss()
 
     best_val_acc = 0.0
-    for epoch in range(1, epochs + 1):
+    for epoch in trange(1, epochs + 1):
         train_loss, train_acc = train_epoch(model, train_loader, optimizer, criterion, device)
         val_loss, val_acc = evaluate(model, val_loader, criterion, device)
 

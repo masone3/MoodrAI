@@ -137,6 +137,14 @@ class MusicMoodGUI:
         self.compare_btn = ttk.Button(self.root, text="Compare All Models", command=self.compare_all_models)
         self.compare_btn.pack(pady=5)
 
+        self.progress = ttk.Progressbar(
+            self.root,
+            orient="horizontal",
+            mode="determinate",
+            length=300
+        )
+        self.progress.pack(pady=10)
+
 
         # -------------------------------
         # Output box
@@ -231,32 +239,51 @@ class MusicMoodGUI:
 
         model_type = self.model_type_var.get()
 
+        self.progress["value"] = 0
+        self.root.update_idletasks()
+
         try:
             if model_type in ["logreg", "svm", "rf"]:
                 # ----------------------------
                 # SCIKIT-LEARN PATH
                 # ----------------------------
+                self.progress["maximum"] = 4
+
                 assert hasattr(self.valence_model, "predict_proba"), "Expected Scikit model, got CNN"
 
                 feats = extract_features(self.filepath)
+                self.progress["value"] = 1
+                self.root.update_idletasks()
                 df = pd.DataFrame([feats]).reindex(columns=self.feature_cols, fill_value=0)
 
                 X_scaled_val = self.valence_scaler.transform(df.values)
                 valence_prob = self.valence_model.predict_proba(X_scaled_val)[0][1] # type: ignore
+                self.progress["value"] = 2
+                self.root.update_idletasks()
 
                 X_scaled_ar = self.arousal_scaler.transform(df.values)
                 arousal_prob = self.arousal_model.predict_proba(X_scaled_ar)[0][1] # type: ignore
+                self.progress["value"] = 3
+                self.root.update_idletasks()
 
             elif model_type == "cnn":
                 # ----------------------------
                 # CNN PATH
                 # ----------------------------
+                self.progress["maximum"] = 3
+
                 assert hasattr(self.valence_model, "forward"), "Expected CNN model, got Scikit"
 
                 # --- Extract Mel Spectrogram ---
                 S_val = self.extract_mel_spectrogram(self.filepath)
+                self.progress["value"] = 1
+                self.root.update_idletasks()
+
                 S_val = np.nan_to_num(S_val)
                 S_val = (S_val - S_val.mean()) / (S_val.std() + 1e-6)
+                self.progress["value"] = 2
+                self.root.update_idletasks()
+
                 S_val = torch.tensor(S_val, dtype=torch.float32).unsqueeze(0).unsqueeze(0).to(self.device)
 
                 # --- Extract global features ---
@@ -275,6 +302,8 @@ class MusicMoodGUI:
 
                     valence_prob = valence_softmax[0, 1].item()
                     arousal_prob = arousal_softmax[0, 1].item()
+                self.progress["value"] = 3
+                self.root.update_idletasks()
 
                 # --- Debug prints ---
                 print("DEBUG — raw logits:", valence_logits.cpu().numpy(), arousal_logits.cpu().numpy())
@@ -291,6 +320,7 @@ class MusicMoodGUI:
             self.output_box.insert(tk.END, f"File: {os.path.basename(self.filepath)}\n\n")
             self.output_box.insert(tk.END, f"Valence (0=Low, 1=High): {valence_prob:.2f}\n")
             self.output_box.insert(tk.END, f"Arousal (0=Low, 1=High): {arousal_prob:.2f}\n")
+            self.progress.stop()
 
             with open("prediction_history.csv", "a") as log:
                 log.write(f"{os.path.basename(self.filepath)},{model_type},{valence_prob:.3f},{arousal_prob:.3f}\n")
@@ -300,6 +330,8 @@ class MusicMoodGUI:
             self.show_valence_arousal_plot(valence_scaled, arousal_scaled)
 
         except Exception as e:
+            self.progress.stop()
+            messagebox.showerror("Error", str(e))
             messagebox.showerror("Prediction Error", f"Could not classify file: {e}")
 
     def compare_all_models(self):
