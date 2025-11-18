@@ -3,89 +3,149 @@
 ## Product Logo
 ![Image of the logo for the Moodr AI project, added in the Markdown, of a green geometric symbol with "Moodr AI AI Music Mood Classifier wrote underneath".](MoodrAI.png)
 
-## Description/Motivation
+## Description / Motivation
 
-Moodr AI is a machine learning project that predicts the mood or genre of a given song by analyzing its audio features. The project extracts features such as Mel-frequency cepstral coefficients (MFCCs), chroma, tempo, and spectral contrast from audio files, then applies machine learning and deep learning models to classify the song’s mood (e.g., happy, sad, energetic, calm). 
+Moodr AI is a machine learning and deep learning system that predicts the emotional mood of a song by analyzing its audio signal. It extracts features such as MFCCs, chroma, tempo, spectral properties, and global audio statistics, then applies multiple machine learning models—Logistic Regression, SVM, Random Forest, and a CNN on Mel spectrograms—to classify the emotional dimensions of *valence* (positive/negative) and *arousal* (energy).
 
-This project is both fun and useful:  
-- Fun because it allows listeners to explore music based on *how it feels* rather than just by artist or title.  
-- Useful because it could be extended into playlist generation, personalized recommendations, or music therapy applications.  
-- Interesting as a capstone because it combines signal processing, applied AI, user-facing software, and interpretability.  
+The project is:
 
-By the end of the semester, the system will provide a simple user interface where someone can upload an audio file and receive a predicted mood label.
+- **Fun**: lets users explore music by *emotion*, not genre.  
+- **Practical**: could fuel playlist generation or therapeutic applications.  
+- **Technically rich**: requires audio DSP, ML, deep learning, UX design, and evaluation.
+
+By the end of the semester, the system provides a desktop GUI where a user uploads an audio file and receives a predicted mood and visualization on the valence–arousal quadrant.
+
+---
 
 ## Project Concept
 
-The primary goal of this project is to create an application capable of analyzing music tracks and classifying them into emotional or mood-based categories (e.g., happy, sad, energetic, calm). This classifier will use artificial intelligence techniques—specifically machine learning and audio signal processing—to understand the relationship between audio features and perceived emotions.  
+The application classifies songs into emotional quadrants—Happy/Energetic, Angry/Tense, Sad/Depressed, Calm/Relaxed—using machine learning models built on audio-derived features. Both classical ML (scikit-learn) and a convolutional neural network (CNN) trained on Mel spectrograms are supported.
 
-For more information, here is the [concept link](concept.md).
+More details here: [concept link](concept.md)
+
+---
 
 ## Scope
-Moodr AI will focus on analyzing audio files, extracting features, and classifying tracks into a small set of moods (e.g., happy, sad, calm, energetic). The system will include feature extraction, model training, and a simple graphical user interface (GUI) for user interaction. Out of scope are advanced features such as real-time mood classification of live audio, integration with third-party streaming services, and lyric-based sentiment analysis, which are reserved for possible future work.
+
+**In scope**
+- Audio loading and preprocessing (30-second analysis windows)
+- Feature extraction using Librosa + custom global audio statistics
+- Three scikit-learn models (LogReg, SVM, Random Forest)
+- A CNN that uses spectrograms + global features
+- Balanced CNN training via `WeightedRandomSampler`
+- GUI for uploading a file, running prediction, and viewing results
+- Progress bars for CNN training
+- Unit test suite ensuring code correctness
+
+**Out of scope**
+- Real-time mood detection  
+- Streaming service integration  
+- Multimodal (lyrics + audio) mood detection  
+- Multi-label emotion prediction  
+
+---
 
 ## Vision
-The vision of this project is to create an accessible AI tool that bridges music and emotion by automatically classifying songs into moods. When completed, the tool will provide users with a simple way to organize, understand, and interact with music emotionally—whether for personal listening, creative projects, or research. While compact in scope for this course, the system serves as a foundation for richer music-emotion applications in the future.
 
-### Prerequisites
-To run Moodr AI, you will need the following:  
-- Python 3.10+ (recommended, works with 3.13 if supported by libraries)  
-- An IDE such as VS Code, PyCharm, VS Studio
-- Required Python libraries:  
-  - `librosa` (audio feature extraction)  
-  - `numpy` and `pandas` (data handling)  
-  - `matplotlib` (data visualization)  
-  - `scikit-learn` (baseline classifiers)  
-  - `pytorch` (for CNNs on spectrograms, optional stretch goal)  
-  - `TKinter` (for the GUI)  
-  - `Rainbow CSV` for reading the CSV files in a cohesive manner
+Moodr AI aims to provide an accessible bridge between music and emotion. The MVP enables emotional classification for individual tracks, but the design supports long-term expansion into personalized recommendation systems, playlist generation, therapy tools, or research platforms.
+
+---
+
+## Prerequisites
+
+To run Moodr AI, you will need:
+
+- **Python 3.10+** (tested up through 3.12)
+- An IDE such as VS Code or PyCharm
+- Required Python libraries:
+  - `librosa` – audio feature extraction
+  - `numpy`, `pandas` – feature processing
+  - `matplotlib` – visualization
+  - `scikit-learn` – Logistic Regression / SVM / Random Forest models
+  - `torch` – CNN architecture and training
+  - `tkinter` – desktop GUI
+  - `tqdm` – progress bars during CNN training
+  - `pytest` – test suite
+  - `pickle` – loading/saving trained models
+
+---
 
 ## Requirements
 
-The AI-Based Music Mood Classifier aims to analyze audio tracks and predict their emotional content (valence and arousal). This project supports students, researchers, and music enthusiasts by providing automated labeling of music moods, useful for playlists, studies, and music therapy.
+Moodr AI analyzes a 30-second slice of audio and predicts valence and arousal scores. These values are mapped to a quadrant that represents the emotional tone of the music.
 
-For more information on the requirements: [requirements link](requirements.md)
+More details: [requirements link](requirements.md)
+
+---
 
 ## Design
 
-The system is organized into modular components for data loading, feature extraction, classification, and a simple GUI for user interaction. This separation ensures clarity, easier testing, and flexibility to extend the project with more advanced models in the future.
+The architecture is split into modular components:
 
-For more information on the design: [design link](design.md)
+- `features.py` – classical feature extraction (MFCCs, chroma, tempo, etc.)
+- `features_extra.py` – global audio stats (RMS, tempo, onset flux, dynamic range)
+- `cnn_model.py` – spectrogram extraction, dataset, and CNN architecture
+- `baseline_classifier.py` – scikit-learn models and training
+- `data_loader.py` – DEAM dataset parsing and labeling
+- `gui.py` – the Tkinter user interface
+- `main.py` – unified training entry point supporting multiple model types
+
+More information: [design link](design.md)
+
+---
 
 ## Test Plan
 
-This testing plan outlines how Moodr AI’s data processing, CNN model training, and GUI functionality are validated for accuracy and stability. It includes key test cases covering dataset integrity, feature extraction, model performance, and end-to-end predictions through the user interface. Each test ensures that the system reliably classifies songs along the valence–arousal spectrum and provides clear visual and textual outputs to the user.
+Moodr AI includes a full `pytest` suite covering:
 
-For more information on the design: [test plan link](test.plan.md)
+- Feature extraction and numerical correctness
+- Global audio statistics robustness
+- Spectrogram dataset construction and normalization
+- GUI behavior (model selection, missing file handling)
+- Edge-case handling such as empty audio and invalid paths
+
+Updated test plan: [test plan link](test.plan.md)
+
+---
 
 ## Built With
 
-- [Librosa](https://librosa.org/): Python package for music and audio analysis.  
-- [Scikit-learn](https://scikit-learn.org/): ML library for baseline classification models.  
-- [PyTorch](https://pytorch.org/): Deep learning framework (for CNN spectrogram classifier).  
-- [TKinter](https://docs.python.org/3/library/tkinter.html/): Simple Python-based app GUI (for demo UI).
-- [Pandas](https://pandas.pydata.org/): Used for data handling, cleaning, and managing the annotation data.
-- [Numpy](https://numpy.org/) Also used for data handling, cleaning, and managing the annotation data.
-- [Pickle](https://docs.python.org/3/library/pickle.html) Used for storing and loading trained models.
-- [Matplotlib](https://matplotlib.org/) Used for displaying graphs and other results-related visuals.
-- [tqdm](https://tqdm.github.io/) Used for displaying progress bars for training and within the GUI for music classification.
-- VS Code: Primary IDE. 
+- **Librosa** – Music/audio analysis  
+- **Scikit-learn** – Baseline models (LogReg, SVM, Random Forest)  
+- **PyTorch** – CNN classifier on spectrograms  
+- **Tkinter** – User interface  
+- **Pandas** – Annotation data handling  
+- **NumPy** – Feature computation  
+- **Matplotlib** – Visualization (quadrant plot + training graphs)  
+- **tqdm** – Progress bars for CNN training  
+- **WeightedRandomSampler (PyTorch)** – Balanced batch training for imbalanced DEAM labels  
+- **pytest** – Comprehensive unit test suite  
+- **pickle** – Saving/loading models  
+- **VS Code** – Primary development IDE  
+
+---
 
 ## Author
 
 ![Simple avatar of Easton, a fair-skinned man with a brown hat, glasses, and a grey shirt.](Avatar.png)
 
-**Easton Mason**: *Moodr AI* [https://www.linkedin.com/in/easton-mason/](https://www.linkedin.com/in/easton-mason/)
+**Easton Mason** — Lead Developer  
+LinkedIn: https://www.linkedin.com/in/easton-mason/
 
-**Lead Developer**: Easton Mason is the lead and sole developer of this project. Born and raised in Morgantown, Kentucky, he has been passionate about both music and technology since childhood. Combining these interests, Easton designed this application to explore the intersection of sound, emotion, and machine learning. He enjoys discovering new artists across all genres and finding creative ways to connect technology with the art of music.
+Easton designed, implemented, tested, and documented all components of Moodr AI. His passion for both music and machine learning inspired a system that blends signal processing with emotional understanding.
+
+---
 
 ## Acknowledgments
 
-- [DEAM Dataset](https://cvml.unige.ch/databases/DEAM/) for mood classification research and initial audio classification experiments.  
-- Tutorials and documentation from the Librosa, Scikit-learn, and PyTorch communities.
-- Professor Wilborne and peers at Berea College who provided feedback and brainstorming support.  
-- Berea College
+- **DEAM Dataset** – Source of labeled valence–arousal data  
+- Community documentation from Librosa, Scikit-learn, and PyTorch  
+- Professor Wilborne and peers at Berea College  
+- Berea College for supporting this capstone project  
 
-## License (not required initially)
+---
 
-This project is licensed under the MIT License - see the wiki page (https://en.wikipedia.org/wiki/MIT_License) for details
+## License
 
+This project is released under the MIT License.  
+See: https://en.wikipedia.org/wiki/MIT_License
