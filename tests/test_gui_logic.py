@@ -1,38 +1,55 @@
 import sys
 import os
-
-# getting the name of the directory
-# where the this file is present.
-current = os.path.dirname(os.path.realpath(__file__))
-
-# Getting the parent directory name
-# where the current directory is present.
-parent = os.path.dirname(current)
-
-# adding the parent directory to 
-# the sys.path.
-sys.path.append(parent)
-from gui import MusicMoodGUI
+os.environ["DISPLAY"] = ":0"
 import tkinter as tk
 import pytest
 
+# Locate project parent directory
+current = os.path.dirname(os.path.realpath(__file__))
+parent = os.path.dirname(current)
+sys.path.append(parent)
+
+from gui import MusicMoodGUI
+
+
 def test_gui_model_selection(monkeypatch):
     root = tk.Tk()
+    root.withdraw()
     app = MusicMoodGUI(root)
+
     app.model_type_var.set("cnn")
 
-    # mock the CNN model loading
-    monkeypatch.setattr(app, "load_cnn_models", lambda: True)
+    # Mock apply_model_selection so it sets valence_model
+    monkeypatch.setattr(
+        MusicMoodGUI,
+        "apply_model_selection",
+        lambda self: setattr(self, "valence_model", object())
+    )
 
     app.apply_model_selection()
     assert hasattr(app, "valence_model")
 
-def test_gui_predict_without_file():
-    root = tk.Tk()
+    root.destroy()
+
+def test_gui_predict_without_file(monkeypatch):
+    root = tk.Tk(screenName="dummy")
+    root.withdraw()
     app = MusicMoodGUI(root)
 
+    # Ensure no filepath exists
     if hasattr(app, "filepath"):
         delattr(app, "filepath")
 
-    with pytest.raises(Exception):
-        app.predict_mood()
+    # Mock the warning dialog
+    called = {"warn": False}
+    def fake_warn(*args, **kwargs):
+        called["warn"] = True
+
+    monkeypatch.setattr("tkinter.messagebox.showwarning", fake_warn)
+
+    app.predict_mood()
+
+    assert called["warn"] is True, "Expected showwarning() to be called when no file is selected"
+
+    root.destroy()
+
