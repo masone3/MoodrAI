@@ -6,6 +6,8 @@ Used by data_loader.py.
 """
 
 
+import os
+
 import librosa
 import numpy as np
 import matplotlib.pyplot as plt
@@ -15,6 +17,9 @@ def extract_features(audio_path, n_mfcc=20) -> dict:
     Extract audio features from an audio file and return as a flat dict.
     Each feature is reduced to scalars so it works with pandas DataFrame.
     """
+    if not os.path.isfile(audio_path):
+        raise FileNotFoundError(f"Audio file not found: {audio_path}")
+    
     y, sr = librosa.load(audio_path, duration=30)
 
     # MFCC
@@ -68,7 +73,7 @@ def extract_features(audio_path, n_mfcc=20) -> dict:
     features["bandwidth"] = float(bandwidth_mean)
     features["rolloff"] = float(rolloff_mean)
     features["zcr"] = float(zcr_mean)
-    features["tempo"] = float(tempo)
+    features["tempo"] = float(np.squeeze(tempo))
 
     return features
 
