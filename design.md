@@ -1,8 +1,7 @@
-# 🏗️ Software Design Document (Detailed)
+# 🏗️ Software Design Document
 
 **Project Title:** AI-Based Music Mood Classifier  
 **Author:** Easton Mason  
-**Date:** 2025-09-17  
 
 ---
 

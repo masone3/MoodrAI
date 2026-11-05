@@ -2,8 +2,6 @@
 
 ## *Author:* Easton Mason
 
-## *Course:* CSC 493 – Computing Design Practicum
-
 | **ID**    | **Test Name**                         | **Purpose / Requirement Tested**                                    | **Steps to Test**                                                    | **Expected Result**                                                 |
 | --------- | ------------------------------------- | ------------------------------------------------------------------- | -------------------------------------------------------------------- | ------------------------------------------------------------------- |
 | **TC-01** | **Feature Extraction – Valid File**   | Verify `extract_features` returns a complete, numeric feature dict. | Call `extract_features("data/DEAM/audio/1001.mp3")`.                 | Returns a dict; contains essential keys like `"centroid"`, no NaNs. |

@@ -1,7 +1,6 @@
 # Software Requirements Specification (SRS)
-**Project:** AI Music Mood Classifier  
+**Project:** Moodr AI Music Mood Classifier  
 **Author:** Easton Mason 
-**Date:** 8/28/2025 
 
 ---
 
