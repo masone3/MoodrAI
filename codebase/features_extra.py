@@ -22,7 +22,7 @@ def extract_audio_stats(y_or_path, sr=22050):
         onset_env = librosa.onset.onset_strength(y=y, sr=sr)
         flux = float(np.mean(np.diff(onset_env))) if onset_env.size > 1 else 0.0
 
-        arr = np.array([rms, float(tempo), flux, dyn_range], dtype=np.float32)
+        arr = np.array([rms, float(np.squeeze(tempo)), flux, dyn_range], dtype=np.float32)
         return np.nan_to_num(arr)
 
     except Exception as e:
