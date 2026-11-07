@@ -18,6 +18,7 @@ import pickle
 from codebase.features import extract_features
 from codebase.features_extra import extract_audio_stats
 from codebase.cnn_model import MusicMoodCNN, extract_mel_spectrogram
+from codebase.predict import predict_track
 
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
@@ -239,99 +240,30 @@ class MusicMoodGUI:
 
         model_type = self.model_type_var.get()
 
+        self.progress["maximum"] = 1
         self.progress["value"] = 0
         self.root.update_idletasks()
 
         try:
-            if model_type in ["logreg", "svm", "rf"]:
-                # ----------------------------
-                # SCIKIT-LEARN PATH
-                # ----------------------------
-                self.progress["maximum"] = 4
+            result = predict_track(self.filepath, model_type)
+            valence_prob, arousal_prob = result.valence, result.arousal
+            self.progress["value"] = 1
+            self.root.update_idletasks()
 
-                assert hasattr(self.valence_model, "predict_proba"), "Expected Scikit model, got CNN"
-
-                feats = extract_features(self.filepath)
-                self.progress["value"] = 1
-                self.root.update_idletasks()
-                df = pd.DataFrame([feats]).reindex(columns=self.feature_cols, fill_value=0)
-
-                X_scaled_val = self.valence_scaler.transform(df.values)
-                valence_prob = self.valence_model.predict_proba(X_scaled_val)[0][1] # type: ignore
-                self.progress["value"] = 2
-                self.root.update_idletasks()
-
-                X_scaled_ar = self.arousal_scaler.transform(df.values)
-                arousal_prob = self.arousal_model.predict_proba(X_scaled_ar)[0][1] # type: ignore
-                self.progress["value"] = 3
-                self.root.update_idletasks()
-
-            elif model_type == "cnn":
-                # ----------------------------
-                # CNN PATH
-                # ----------------------------
-                self.progress["maximum"] = 3
-
-                assert hasattr(self.valence_model, "forward"), "Expected CNN model, got Scikit"
-
-                # --- Extract Mel Spectrogram ---
-                S_val = self.extract_mel_spectrogram(self.filepath)
-                self.progress["value"] = 1
-                self.root.update_idletasks()
-
-                S_val = np.nan_to_num(S_val)
-                S_val = (S_val - S_val.mean()) / (S_val.std() + 1e-6)
-                self.progress["value"] = 2
-                self.root.update_idletasks()
-
-                S_val = torch.tensor(S_val, dtype=torch.float32).unsqueeze(0).unsqueeze(0).to(self.device)
-
-                # --- Extract global features ---
-                global_feats = extract_audio_stats(self.filepath)
-                global_feats = np.nan_to_num(global_feats)
-                global_feats = torch.tensor(global_feats, dtype=torch.float32).unsqueeze(0).to(self.device)
-
-                with torch.no_grad():
-                    # Forward pass through both CNNs (valence and arousal)
-                    valence_logits = self.valence_model(S_val, global_feats)
-                    arousal_logits = self.arousal_model(S_val, global_feats)
-
-                    # Softmax to convert to probabilities
-                    valence_softmax = torch.softmax(valence_logits, dim=1)
-                    arousal_softmax = torch.softmax(arousal_logits, dim=1)
-
-                    valence_prob = valence_softmax[0, 1].item()
-                    arousal_prob = arousal_softmax[0, 1].item()
-                self.progress["value"] = 3
-                self.root.update_idletasks()
-
-                # --- Debug prints ---
-                print("DEBUG — raw logits:", valence_logits.cpu().numpy(), arousal_logits.cpu().numpy())
-                print("DEBUG — softmax:", valence_softmax.cpu().numpy(), arousal_softmax.cpu().numpy())
-                print("DEBUG — probs:", valence_prob, arousal_prob)
-
-
-                    
-
-            # ----------------------------
-            # Shared display section
-            # ----------------------------
             self.output_box.delete("1.0", tk.END)
             self.output_box.insert(tk.END, f"File: {os.path.basename(self.filepath)}\n\n")
             self.output_box.insert(tk.END, f"Valence (0=Low, 1=High): {valence_prob:.2f}\n")
             self.output_box.insert(tk.END, f"Arousal (0=Low, 1=High): {arousal_prob:.2f}\n")
+            self.output_box.insert(tk.END, f"Mood: {result.mood}\n")
             self.progress.stop()
 
             with open("prediction_history.csv", "a") as log:
                 log.write(f"{os.path.basename(self.filepath)},{model_type},{valence_prob:.3f},{arousal_prob:.3f}\n")
 
-            valence_scaled = (valence_prob * 2) - 1
-            arousal_scaled = (arousal_prob * 2) - 1
-            self.show_valence_arousal_plot(valence_scaled, arousal_scaled)
+            self.show_valence_arousal_plot((valence_prob * 2) - 1, (arousal_prob * 2) - 1)
 
         except Exception as e:
             self.progress.stop()
-            messagebox.showerror("Error", str(e))
             messagebox.showerror("Prediction Error", f"Could not classify file: {e}")
 
     def compare_all_models(self):

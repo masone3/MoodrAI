@@ -47,4 +47,4 @@ def test_extract_audio_stats_not_all_zeros():
     y = 0.5 * np.sin(2 * np.pi * 440 * t).astype(np.float32)  # 3 s of a 440 Hz tone
     stats = extract_audio_stats(y, sr=sr)
     assert stats.shape == (4,)
-    assert np.any(stats != 0)s
+    assert np.any(stats != 0)
