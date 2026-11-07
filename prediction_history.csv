@@ -126,3 +126,9 @@ Metallica - Dyers Eve.mp3,cnn,0.722,0.896
 MESHUGGAH - Demiurge (Official Music Video).mp3,logreg,0.543,0.467
 MESHUGGAH - Demiurge (Official Music Video).mp3,cnn,0.080,0.142
 MESHUGGAH - Bleed (Official Music Video).mp3,cnn,0.641,0.579
+Avenged Sevenfold- Scream.mp3,logreg,0.917,0.960
+Avenged Sevenfold- Scream.mp3,svm,0.801,0.899
+Avenged Sevenfold- Scream.mp3,svm,0.801,0.899
+Avenged Sevenfold- Scream.mp3,rf,0.910,0.910
+Avenged Sevenfold- Scream.mp3,cnn,0.692,0.820
+Avenged Sevenfold- Scream.mp3,logreg,0.917,0.960
