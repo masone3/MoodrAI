@@ -127,8 +127,6 @@ Updated test plan: [test plan link](test.plan.md)
 
 ## Author
 
-![Simple avatar of Easton, a fair-skinned man with a brown hat, glasses, and a grey shirt.](Avatar.png)
-
 **Easton Mason** — Lead Developer  
 LinkedIn: https://www.linkedin.com/in/easton-mason/
 
