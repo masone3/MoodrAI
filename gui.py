@@ -255,6 +255,10 @@ class MusicMoodGUI:
             self.output_box.insert(tk.END, f"Valence (0=Low, 1=High): {valence_prob:.2f}\n")
             self.output_box.insert(tk.END, f"Arousal (0=Low, 1=High): {arousal_prob:.2f}\n")
             self.output_box.insert(tk.END, f"Mood: {result.mood}\n")
+            if result.borderline:
+                self.output_box.insert(
+                    tk.END, "(borderline: close to a neighboring mood)\n"
+                )
             self.progress.stop()
 
             with open("prediction_history.csv", "a") as log:
