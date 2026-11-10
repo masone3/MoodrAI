@@ -8,6 +8,9 @@ so it is easy to test and easy to change when we tune the boundaries.
 # Boundaries between "low", "mid" and "high" on both axes (0..1 scale).
 CUTS = (1 / 3, 2 / 3)
 
+# A song closer that this to a boundary line is flagged "borderline".
+BORDERLINE_MARGIN = 0.05
+
 # (arousal band, valence band) -> mood name
 GRID = {
     ("high", "low"): "intense",   ("high", "mid"): "energetic", ("high", "high"): "euphoric",
