@@ -1,6 +1,6 @@
 import pytest
 
-from codebase.predict import ENSEMBLE, MODEL_TYPES, ROOT, predict_track
+from codebase.predict import ALL_TYPES, ROOT, predict_track
 from codebase.moods import MOODS
 
 SAMPLE = ROOT / "data" / "DEAM" / "audio" / "1001.mp3"
@@ -16,7 +16,7 @@ def test_missing_file_raises():
         predict_track("fake/path.mp3", "rf")
 
 
-@pytest.mark.parametrize("model_type", MODEL_TYPES + (ENSEMBLE,))
+@pytest.mark.parametrize("model_type", ALL_TYPES)
 def test_predict_track_returns_valid_scores(model_type):
     result = predict_track(str(SAMPLE), model_type)
     assert 0.0 <= result.valence <= 1.0
