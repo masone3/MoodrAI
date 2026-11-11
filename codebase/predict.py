@@ -15,6 +15,7 @@ import numpy as np
 import pandas as pd
 
 from codebase.features import extract_features
+from codebase.features_harmony import extract_harmony_features
 from codebase.moods import BORDERLINE_MARGIN, classify_mood, mood_margin
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -23,14 +24,16 @@ FEATURES_CSV = ROOT / "data" / "DEAM" / "features.csv"
 
 SKLEARN_MODELS = ("logreg", "svm", "rf")
 MODEL_TYPES = SKLEARN_MODELS + ("cnn",)
+REG = "reg"
 ENSEMBLE = "ensemble"
+ALL_TYPES = MODEL_TYPES + (REG, ENSEMBLE)
 AXES = ("valence", "arousal")
 
 
 @dataclass(frozen=True)
 class Prediction:
-    valence: float      # probability of "high valence", 0..1
-    arousal: float      # probability of "high arousal", 0..1
+    valence: float      # 0..1 (probability of "high", or percentile for the reg model)
+    arousal: float      # 0..1
     mood: str           # one of the nine names in moods.py
     margin: float       # distance to the nearest mood boundary
     model_type: str
@@ -76,6 +79,16 @@ def load_cnn_models():
     return models, device
 
 
+@lru_cache(maxsize=None)
+def load_regression_models():
+    def _load(name):
+        with open(MODELS_DIR / name, "rb") as f:
+            return pickle.load(f)
+
+    models = {axis: _load(f"reg_rf_{axis}.pkl") for axis in AXES}
+    return models, _load("reg_reference.pkl")
+
+
 def _predict_sklearn(path: str, model_type: str, feats: dict | None = None):
     bundle, columns = load_sklearn_models(model_type)
     if feats is None:
@@ -109,8 +122,20 @@ def _predict_cnn(path: str):
     return probs["valence"], probs["arousal"]
 
 
+def _predict_regression(path: str):
+    """Predict 1-9 scores, then convert each to a 0..1 percentile among DEAM songs."""
+    models, reference = load_regression_models()
+    feats = {**extract_features(path), **extract_harmony_features(path)}
+    out = {}
+    for axis, pipe in models.items():
+        X = pd.DataFrame([feats]).reindex(columns=list(pipe.feature_names_in_), fill_value=0)
+        score = float(pipe.predict(X)[0])
+        out[axis] = float(np.searchsorted(reference[axis], score) / len(reference[axis]))
+    return out["valence"], out["arousal"]
+
+
 def _predict_ensemble(path: str):
-    """Average the four models' scores into one valence and one arousal."""
+    """Average the four classifiers' scores into one valence and one arousal."""
     feats = extract_features(path)  # computed once, shared by the three sklearn models
     scores = [_predict_sklearn(path, m, feats) for m in SKLEARN_MODELS]
     scores.append(_predict_cnn(path))
@@ -121,15 +146,15 @@ def _predict_ensemble(path: str):
 
 def predict_track(path: str, model_type: str = ENSEMBLE) -> Prediction:
     """Classify one audio file. This is the function the rest of the project calls."""
-    if model_type not in MODEL_TYPES + (ENSEMBLE,):
-        raise ValueError(
-            f"Unknown model_type {model_type!r}; choose from {MODEL_TYPES + (ENSEMBLE,)}"
-        )
+    if model_type not in ALL_TYPES:
+        raise ValueError(f"Unknown model_type {model_type!r}; choose from {ALL_TYPES}")
     if not Path(path).is_file():
         raise FileNotFoundError(f"Audio file not found: {path}")
 
     if model_type == ENSEMBLE:
         valence, arousal = _predict_ensemble(path)
+    elif model_type == REG:
+        valence, arousal = _predict_regression(path)
     elif model_type == "cnn":
         valence, arousal = _predict_cnn(path)
     else:
