@@ -57,3 +57,35 @@ class SpotifyClient:
             }
             for t in items if t
         ]
+
+    def my_playlists(self):
+        """Every playlist in your library (paged, 50 at a time)."""
+        found, offset = [], 0
+        while True:
+            resp = self.request("GET", "/me/playlists", params={"limit": 50, "offset": offset})
+            resp.raise_for_status()
+            batch = resp.json().get("items", [])
+            found += [p for p in batch if p]
+            if len(batch) < 50:
+                return found
+            offset += 50
+
+    def create_playlist(self, name, description=""):
+        resp = self.request("POST", "/me/playlists",
+                            json={"name": name, "public": False, "description": description})
+        resp.raise_for_status()
+        return resp.json()["id"]
+
+    def add_items(self, playlist_id, uris):
+        for i in range(0, len(uris), 100):  # Spotify accepts at most 100 per request
+            resp = self.request("POST", f"/playlists/{playlist_id}/items",
+                                json={"uris": uris[i:i + 100]})
+            resp.raise_for_status()
+
+    def remove_items(self, playlist_id, uris):
+        ok = True
+        for i in range(0, len(uris), 100):
+            resp = self.request("DELETE", f"/playlists/{playlist_id}/items",
+                                json={"items": [{"uri": u} for u in uris[i:i + 100]]})
+            ok = ok and resp.ok
+        return ok
