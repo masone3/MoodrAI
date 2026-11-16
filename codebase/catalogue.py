@@ -28,9 +28,14 @@ CREATE TABLE IF NOT EXISTS tracks (
     mood         TEXT NOT NULL,
     margin       REAL NOT NULL,
     model_type   TEXT NOT NULL,
-    added_at     TEXT NOT NULL
+        added_at     TEXT NOT NULL,
+    synced_mood  TEXT
 );
 CREATE INDEX IF NOT EXISTS idx_tracks_mood ON tracks(mood);
+CREATE TABLE IF NOT EXISTS playlists (
+    mood        TEXT PRIMARY KEY,
+    playlist_id TEXT NOT NULL
+);
 """
 
 
@@ -41,6 +46,10 @@ def open_db(path=DB_PATH):
     conn = sqlite3.connect(path)
     conn.row_factory = sqlite3.Row  # rows can be read by column name
     conn.executescript(SCHEMA)
+    cols = {r["name"] for r in conn.execute("PRAGMA table_info(tracks)")}
+    if "synced_mood" not in cols:  # upgrade a catalogue created before Day 11
+        conn.execute("ALTER TABLE tracks ADD COLUMN synced_mood TEXT")
+        conn.commit()
     return conn
 
 
@@ -91,3 +100,28 @@ def refresh_moods(conn):
         changed += mood != row["mood"]
     conn.commit()
     return changed
+
+def get_playlist_id(conn, mood):
+    row = conn.execute("SELECT playlist_id FROM playlists WHERE mood = ?", (mood,)).fetchone()
+    return row["playlist_id"] if row else None
+
+
+def set_playlist_id(conn, mood, playlist_id):
+    conn.execute("INSERT OR REPLACE INTO playlists (mood, playlist_id) VALUES (?, ?)",
+                 (mood, playlist_id))
+    conn.commit()
+
+
+def unsynced(conn, include_review=False):
+    """Songs with a usable Spotify match whose playlist doesn't yet match their mood."""
+    statuses = ("matched", "review") if include_review else ("matched",)
+    marks = ",".join("?" * len(statuses))
+    return conn.execute(
+        f"""SELECT * FROM tracks
+            WHERE spotify_uri != '' AND match_status IN ({marks})
+              AND (synced_mood IS NULL OR synced_mood != mood)""", statuses).fetchall()
+
+
+def mark_synced(conn, track_id, mood):
+    conn.execute("UPDATE tracks SET synced_mood = ? WHERE id = ?", (mood, track_id))
+    conn.commit()
