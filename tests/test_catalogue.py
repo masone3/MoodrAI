@@ -2,7 +2,8 @@ import sqlite3
 
 import pytest
 
-from codebase.catalogue import add_track, by_mood, has_file, mood_counts, open_db, recent, refresh_moods
+from codebase.catalogue import (add_track, by_mood, has_file, mood_counts, open_db, recent,
+                                refresh_moods, set_override, update_match)
 
 
 @pytest.fixture
