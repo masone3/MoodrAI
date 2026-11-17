@@ -2,34 +2,35 @@
 catalogue.py
 ------------
 The song catalogue: one SQLite table holding each song's Spotify match, scores and mood.
-Mood and margin are always computed from the stored scores, so they can never disagree.
+Mood and margin are computed from the stored scores unless you pinned a mood by hand.
 """
 import sqlite3
 from datetime import datetime, timezone
 from pathlib import Path
 
-from codebase.moods import classify_mood, mood_margin
+from codebase.moods import MOODS, classify_mood, mood_margin
 
 DB_PATH = Path(__file__).resolve().parent.parent / "data" / "catalogue.db"
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS tracks (
-    id           INTEGER PRIMARY KEY AUTOINCREMENT,
-    file         TEXT NOT NULL UNIQUE,
-    title        TEXT,
-    artist       TEXT,
-    spotify_id   TEXT,
-    spotify_uri  TEXT,
-    spotify_url  TEXT,
-    match_status TEXT,
-    match_score  REAL,
-    valence      REAL NOT NULL,
-    arousal      REAL NOT NULL,
-    mood         TEXT NOT NULL,
-    margin       REAL NOT NULL,
-    model_type   TEXT NOT NULL,
-        added_at     TEXT NOT NULL,
-    synced_mood  TEXT
+    id            INTEGER PRIMARY KEY AUTOINCREMENT,
+    file          TEXT NOT NULL UNIQUE,
+    title         TEXT,
+    artist        TEXT,
+    spotify_id    TEXT,
+    spotify_uri   TEXT,
+    spotify_url   TEXT,
+    match_status  TEXT,
+    match_score   REAL,
+    valence       REAL NOT NULL,
+    arousal       REAL NOT NULL,
+    mood          TEXT NOT NULL,
+    margin        REAL NOT NULL,
+    model_type    TEXT NOT NULL,
+    added_at      TEXT NOT NULL,
+    synced_mood   TEXT,
+    mood_override TEXT
 );
 CREATE INDEX IF NOT EXISTS idx_tracks_mood ON tracks(mood);
 CREATE TABLE IF NOT EXISTS playlists (
@@ -40,16 +41,17 @@ CREATE TABLE IF NOT EXISTS playlists (
 
 
 def open_db(path=DB_PATH):
-    """Open (and create, if needed) the catalogue. Pass ':memory:' for a throwaway test copy."""
+    """Open (and create or upgrade) the catalogue. Pass ':memory:' for a throwaway test copy."""
     if str(path) != ":memory:":
         Path(path).parent.mkdir(parents=True, exist_ok=True)
     conn = sqlite3.connect(path)
     conn.row_factory = sqlite3.Row  # rows can be read by column name
     conn.executescript(SCHEMA)
     cols = {r["name"] for r in conn.execute("PRAGMA table_info(tracks)")}
-    if "synced_mood" not in cols:  # upgrade a catalogue created before Day 11
-        conn.execute("ALTER TABLE tracks ADD COLUMN synced_mood TEXT")
-        conn.commit()
+    for col in ("synced_mood", "mood_override"):  # upgrade older catalogues in place
+        if col not in cols:
+            conn.execute(f"ALTER TABLE tracks ADD COLUMN {col} TEXT")
+    conn.commit()
     return conn
 
 
@@ -90,16 +92,45 @@ def mood_counts(conn):
 
 
 def refresh_moods(conn):
-    """Recompute every song's mood from its stored scores. Run after changing the cuts in
-    moods.py, so no audio needs reprocessing. Returns how many songs changed mood."""
+    """Recompute every song's mood from its stored scores, keeping any mood you pinned by hand.
+    Run after changing the cuts in moods.py. Returns how many songs changed mood."""
     changed = 0
-    for row in conn.execute("SELECT id, valence, arousal, mood FROM tracks").fetchall():
-        mood = classify_mood(row["valence"], row["arousal"])
+    for row in conn.execute(
+            "SELECT id, valence, arousal, mood, mood_override FROM tracks").fetchall():
+        mood = row["mood_override"] or classify_mood(row["valence"], row["arousal"])
         conn.execute("UPDATE tracks SET mood = ?, margin = ? WHERE id = ?",
                      (mood, mood_margin(row["valence"], row["arousal"]), row["id"]))
         changed += mood != row["mood"]
     conn.commit()
     return changed
+
+
+def set_override(conn, file, mood):
+    """Pin a song to a mood you chose (mood=None clears it). False if the song isn't in the catalogue."""
+    if mood is not None and mood not in MOODS:
+        raise ValueError(f"Unknown mood {mood!r}; choose from {MOODS}")
+    row = conn.execute("SELECT valence, arousal FROM tracks WHERE file = ?", (file,)).fetchone()
+    if row is None:
+        return False
+    effective = mood or classify_mood(row["valence"], row["arousal"])
+    conn.execute("UPDATE tracks SET mood_override = ?, mood = ? WHERE file = ?",
+                 (mood, effective, file))
+    conn.commit()
+    return True
+
+
+def update_match(conn, file, m):
+    """Replace a song's Spotify match. Leaves its scores, mood and sync state alone."""
+    conn.execute(
+        """UPDATE tracks SET spotify_id=?, spotify_uri=?, spotify_url=?,
+                             match_status=?, match_score=?,
+                             title  = CASE WHEN ? != '' THEN ? ELSE title  END,
+                             artist = CASE WHEN ? != '' THEN ? ELSE artist END
+           WHERE file = ?""",
+        (m["spotify_id"], m["uri"], m["url"], m["status"], m["score"],
+         m["title"], m["title"], m["artist"], m["artist"], file))
+    conn.commit()
+
 
 def get_playlist_id(conn, mood):
     row = conn.execute("SELECT playlist_id FROM playlists WHERE mood = ?", (mood,)).fetchone()
