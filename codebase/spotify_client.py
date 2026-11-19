@@ -70,6 +70,24 @@ class SpotifyClient:
                 return found
             offset += 50
 
+    def playlist_tracks(self, playlist_id):
+        """Every track in a playlist as {'title', 'artist'} dicts."""
+        found, offset = [], 0
+        while True:
+            resp = self.request("GET", f"/playlists/{playlist_id}/items",
+                                params={"limit": 50, "offset": offset})
+            resp.raise_for_status()
+            batch = resp.json().get("items", [])
+            for entry in batch:
+                # February 2026 renamed the nested "track" object to "item"; accept either
+                t = (entry or {}).get("item") or (entry or {}).get("track")
+                if t and t.get("name"):  # skips deleted or local-file entries
+                    found.append({"title": t["name"],
+                                  "artist": ", ".join(a["name"] for a in t.get("artists", []))})
+            if len(batch) < 50:
+                return found
+            offset += 50
+
     def create_playlist(self, name, description=""):
         resp = self.request("POST", "/me/playlists",
                             json={"name": name, "public": False, "description": description})

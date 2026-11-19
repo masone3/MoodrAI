@@ -40,3 +40,10 @@ def test_unrelated_results_are_no_match():
 
 def test_empty_results_are_no_match():
     assert match_track(FakeClient([]), "Some Song.mp3")["status"] == "no_match"
+    
+
+def test_feat_credits_do_not_lower_the_score():
+    client = FakeClient([cand("Get Lucky (feat. Pharrell Williams and Nile Rodgers)",
+                              "Daft Punk, Pharrell Williams, Nile Rodgers", "good")])
+    r = match_track(client, "Daft Punk - Get Lucky.mp3")
+    assert r["status"] == "matched" and r["score"] == 1.0

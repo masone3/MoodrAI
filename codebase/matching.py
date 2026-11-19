@@ -13,6 +13,7 @@ NOISE_WORDS = {
     "lyrics", "lyric", "audio", "remastered", "remaster",
 }
 BRACKETS = re.compile(r"\([^)]*\)|\[[^\]]*\]")
+FEAT = re.compile(r"\s*[\(\[]\s*(?:feat|ft|featuring|with)\b[^)\]]*[\)\]]", re.I)
 
 MATCHED_AT = 0.70   # score at or above this: trust the match
 REVIEW_AT = 0.45    # between the two: keep it, but flag it for a human look
@@ -38,11 +39,18 @@ def filename_tokens(filename):
 
 
 def score(file_toks, artist, title):
-    """Share of words in common between the filename and a result, 0..1 (order ignored)."""
-    a, b = set(file_toks), set(tokens(f"{artist} {title}"))
-    if not a or not b:
+    """Best word-overlap (0..1) between the filename and a result, order ignored.
+    Also tries the lead artist with feat. credits removed, so 'Get Lucky (feat. ...)' isn't penalised."""
+    a = set(file_toks)
+    if not a:
         return 0.0
-    return 2 * len(a & b) / (len(a) + len(b))
+    full = set(tokens(f"{artist} {title}"))
+    core = set(tokens(f"{artist.split(',')[0]} {FEAT.sub('', title)}"))
+    best = 0.0
+    for b in (full, core):
+        if b:
+            best = max(best, 2 * len(a & b) / (len(a) + len(b)))
+    return best
 
 
 def match_track(client, filename):
