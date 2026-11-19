@@ -46,3 +46,28 @@ def test_refresh_moods_repairs_stale_moods(conn):
     conn.execute("UPDATE tracks SET mood = 'wrong'")
     assert refresh_moods(conn) == 1
     assert by_mood(conn, "euphoric")
+
+
+def test_override_wins_and_survives_refresh(conn):
+    add_track(conn, file="a.mp3", valence=0.9, arousal=0.9, model_type="rf")
+    assert set_override(conn, "a.mp3", "serene")
+    refresh_moods(conn)
+    assert by_mood(conn, "serene") and not by_mood(conn, "euphoric")
+    set_override(conn, "a.mp3", None)  # clearing returns the song to the model's opinion
+    assert by_mood(conn, "euphoric")
+
+
+def test_override_rejects_unknown_mood_and_missing_file(conn):
+    add_track(conn, file="a.mp3", valence=0.9, arousal=0.9, model_type="rf")
+    with pytest.raises(ValueError):
+        set_override(conn, "a.mp3", "banana")
+    assert set_override(conn, "zzz.mp3", "serene") is False
+
+
+def test_update_match_keeps_scores_and_mood(conn):
+    add_track(conn, file="a.mp3", valence=0.9, arousal=0.9, model_type="rf",
+              match_status="review", match_score=0.57)
+    update_match(conn, "a.mp3", {"spotify_id": "id1", "uri": "spotify:track:id1", "url": "u",
+                                 "status": "matched", "score": 1.0, "title": "T", "artist": "A"})
+    row = by_mood(conn, "euphoric")[0]
+    assert row["match_status"] == "matched" and row["title"] == "T" and row["valence"] == 0.9
