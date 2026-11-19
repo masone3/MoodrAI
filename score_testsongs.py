@@ -7,7 +7,7 @@ import pandas as pd
 
 warnings.filterwarnings("ignore")  # hides the scikit-learn version warnings
 
-from codebase.predict import MODEL_TYPES, predict_track
+from codebase.predict import ALL_TYPES, predict_track
 
 SONG_DIR = Path("data/testsongs")
 OUT = Path("data/validation/ratings.csv")
@@ -25,7 +25,7 @@ def main():
             continue
         print(f"Scoring {path.name} ...")
         row = {"file": path.name}
-        for m in MODEL_TYPES:
+        for m in ALL_TYPES:
             try:
                 r = predict_track(str(path), m)
                 row[f"{m}_valence"], row[f"{m}_arousal"] = round(r.valence, 3), round(r.arousal, 3)
