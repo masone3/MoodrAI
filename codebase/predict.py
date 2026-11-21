@@ -11,6 +11,7 @@ from dataclasses import dataclass
 from functools import lru_cache
 from pathlib import Path
 
+import json
 import numpy as np
 import pandas as pd
 
@@ -20,7 +21,7 @@ from codebase.moods import BORDERLINE_MARGIN, classify_mood, mood_margin
 
 ROOT = Path(__file__).resolve().parent.parent
 MODELS_DIR = ROOT / "models"
-FEATURES_CSV = ROOT / "data" / "DEAM" / "features.csv"
+FEATURE_COLUMNS_JSON = MODELS_DIR / "feature_columns.json"
 
 SKLEARN_MODELS = ("logreg", "svm", "rf")
 MODEL_TYPES = SKLEARN_MODELS + ("cnn",)
@@ -42,6 +43,10 @@ class Prediction:
     def borderline(self) -> bool:
         return self.margin < BORDERLINE_MARGIN
 
+@lru_cache(maxsize=None)
+def feature_columns():
+    """The feature names, in the order the classifiers were trained on."""
+    return tuple(json.loads(FEATURE_COLUMNS_JSON.read_text(encoding="utf-8")))
 
 @lru_cache(maxsize=None)
 def load_sklearn_models(model_type: str):
@@ -58,8 +63,7 @@ def load_sklearn_models(model_type: str):
     scaler = bundle["valence"][1]
     columns = getattr(scaler, "feature_names_in_", None)
     if columns is None:
-        header = pd.read_csv(FEATURES_CSV, nrows=0).columns
-        columns = [c for c in header if c != "song_id"]
+        columns = feature_columns()
     return bundle, list(columns)
 
 
