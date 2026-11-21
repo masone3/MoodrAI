@@ -5,23 +5,125 @@
 
 ## Description / Motivation
 
-Moodr AI is a machine learning and deep learning system that predicts the emotional mood of a song by analyzing its audio signal. It extracts features such as MFCCs, chroma, tempo, spectral properties, and global audio statistics, then applies multiple machine learning models—Logistic Regression, SVM, Random Forest, and a CNN on Mel spectrograms—to classify the emotional dimensions of *valence* (positive/negative) and *arousal* (energy).
+Moodr AI predicts the emotional mood of a song from its audio signal and turns a folder of music into a **mood-sorted catalogue**: a browsable page, plus one Spotify playlist per mood.
+
+It extracts features such as MFCCs, chroma, tempo, spectral properties, major/minor mode and loudness, then predicts the two dimensions of emotion psychologists call *valence* (negative to positive) and *arousal* (calm to energetic). The two scores place each song on a 3×3 mood map.
 
 The project is:
 
-- **Fun**: lets users explore music by *emotion*, not genre.  
-- **Practical**: could fuel playlist generation or therapeutic applications.  
-- **Technically rich**: requires audio DSP, ML, deep learning, UX design, and evaluation.
-
-By the end of the semester, the system provides a desktop GUI where a user uploads an audio file and receives a predicted mood and visualization on the valence–arousal quadrant.
+- **Fun**: lets you explore music by *emotion*, not genre.
+- **Practical**: sorts a large library into playlists without listening to every track.
+- **Technically rich**: audio signal processing, classical ML, a CNN, evaluation against human ratings, and a third-party API.
 
 ---
 
-## Project Concept
+## How it works
 
-The application classifies songs into emotional quadrants—Happy/Energetic, Angry/Tense, Sad/Depressed, Calm/Relaxed—using machine learning models built on audio-derived features. Both classical ML (scikit-learn) and a convolutional neural network (CNN) trained on Mel spectrograms are supported.
+```
+audio files ──> features (MFCC, chroma, tempo, mode, loudness)
+            ──> models ──> valence + arousal ──> one of nine moods
+            ──> Spotify search (matches file to track) ──> SQLite catalogue
+            ──> catalogue page (data/catalogue.html) + Spotify playlists "Moodr: <mood>"
+```
 
-More details here: [concept link](concept.md)
+Spotify no longer provides audio analysis to new apps, so Moodr classifies **audio files on your own machine** and uses Spotify only to identify each track, link to it, and hold the playlists.
+
+### The mood map
+
+Each score is cut into low / mid / high bands, giving nine moods:
+
+| | Low valence (darker) | Mid valence | High valence (brighter) |
+|---|---|---|---|
+| **High arousal** | intense | energetic | euphoric |
+| **Mid arousal** | brooding | neutral | cheerful |
+| **Low arousal** | melancholy | mellow | serene |
+
+### Models
+
+| Name | What it is |
+|---|---|
+| `logreg`, `svm`, `rf` | scikit-learn classifiers (high vs low), trained on DEAM |
+| `cnn` | CNN on Mel spectrograms plus global audio statistics |
+| `reg` | **default.** Random forest regression on the 1–9 DEAM scores using 50 features, converted to percentiles among DEAM songs |
+| `ensemble` | average of the four classifiers |
+
+You can pin any song to a mood you choose. Pinned moods always win over the model's, and are marked "corrected" in the catalogue.
+
+---
+
+## Quick start
+
+Developed on macOS with Python 3.14. The GUI needs Tk (`brew install python-tk@3.14` with Homebrew Python).
+
+```bash
+git clone <this repo> moodrai && cd moodrai
+python3 -m venv .venv && source .venv/bin/activate
+python3 -m pip install -r requirements.txt
+python3 -m pytest tests -q
+```
+
+### Classify a folder (no Spotify needed)
+
+```bash
+python3 -W ignore build_catalogue.py ~/path/to/mp3s --no-spotify
+python3 -W ignore export_catalogue.py --open
+```
+
+Name files `Artist - Title.mp3`; Spotify matching works best with that pattern. Songs already in the catalogue are skipped, so you can rerun it as the folder grows.
+
+### Add Spotify matching and playlists
+
+1. Create an app at developer.spotify.com/dashboard (choose **Web API**) with the redirect URI `http://127.0.0.1:8888/callback`. Your own account must be on the app's user list.
+2. Copy `.env.example` to `.env` and paste in your Client ID. Never commit `.env`.
+3. Check that everything works: `python3 spotify_smoke_test.py`
+4. Build and sync:
+
+```bash
+python3 -W ignore build_catalogue.py ~/path/to/mp3s
+python3 -W ignore sync_playlists.py --dry-run   # preview
+python3 -W ignore sync_playlists.py             # create/update the playlists
+```
+
+Spotify's Development Mode requires the app owner to have Premium, allows five authorised users, and gives each developer one Client ID, so anyone else running this needs their own Spotify app. Playlists are created private.
+
+### Correct a mood
+
+```bash
+python3 -c "from codebase.catalogue import open_db, set_override; set_override(open_db(), 'Artist - Title.mp3', 'serene')"
+python3 -W ignore sync_playlists.py   # moves the song to the right playlist
+```
+
+### Desktop GUI
+
+`python3 gui.py` classifies a single file with any model and plots it on the valence–arousal plane.
+
+---
+
+## How well does it work?
+
+| Evidence | Result |
+|---|---|
+| Cross-validated on DEAM (1,802 songs), `reg` model | R² 0.47 for valence, 0.49 for arousal |
+| Against my own mood ratings of 26 songs, rank correlation | arousal 0.57–0.67 (CNN 0.36); valence 0.06–0.34 for every model |
+
+**Energy is predicted reasonably well; positivity is not.** On my test songs, every model's valence score tracked its arousal score almost one-for-one (correlation 0.84–0.97, against 0.58 in DEAM's own labels), so loud songs were called "happy." Heavy rock, a genre DEAM covers thinly, is the clearest failure. The sample is small and has a single rater, so treat these as indicative, not conclusive. That is why corrected moods are first-class: where the model is wrong, your ears win.
+
+Processing speed: [fill in from `time python3 -W ignore build_catalogue.py` on your machine].
+
+---
+
+## Project structure
+
+```
+codebase/       features, models, mood map, prediction, matching, catalogue, Spotify client
+tests/          pytest suite (features, models, moods, matching, catalogue, sync, page)
+data/DEAM/      DEAM annotations and cached features
+models/         trained model files
+main.py         trains the classifiers and the CNN
+train_regression.py, build_harmony_features.py   train the default `reg` model
+build_catalogue.py, sync_playlists.py, export_catalogue.py   the catalogue pipeline
+score_testsongs.py, compare_models.py            check models against your own ratings
+```
 
 ---
 
@@ -29,19 +131,18 @@ More details here: [concept link](concept.md)
 
 **In scope**
 - Audio loading and preprocessing (30-second analysis windows)
-- Feature extraction using Librosa + custom global audio statistics
-- Three scikit-learn models (LogReg, SVM, Random Forest)
-- A CNN that uses spectrograms + global features
-- Balanced CNN training via `WeightedRandomSampler`
-- GUI for uploading a file, running prediction, and viewing results
-- Progress bars for CNN training
-- Unit test suite ensuring code correctness
+- Feature extraction using Librosa plus custom global statistics and harmony features
+- Classifiers (LogReg, SVM, Random Forest), a regression model, and a CNN
+- A nine-mood map with confidence and manual correction
+- Spotify track matching and one playlist per mood
+- A browsable catalogue page and a desktop GUI
+- Validation against personal ratings, and a unit test suite
 
 **Out of scope**
-- Real-time mood detection  
-- Streaming service integration  
-- Multimodal (lyrics + audio) mood detection  
-- Multi-label emotion prediction  
+- Real-time mood detection
+- Multimodal (lyrics + audio) mood detection
+- Multi-label emotion prediction
+- Classifying songs without an audio file on disk
 
 ---
 

@@ -3,4 +3,10 @@ data/catalogue.db
 .venv/
 __pycache__/
 *.pyc
-.DS_Store
+.DS_Store.spotify_cache
+.env
+data/testsongs/
+data/catalogue.db
+data/catalogue.html
+data/validation/my_playlist.txt
+data/validation/spotify_matches.csv
