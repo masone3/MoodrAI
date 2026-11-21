@@ -18,7 +18,9 @@ import pickle
 from codebase.features import extract_features
 from codebase.features_extra import extract_audio_stats
 from codebase.cnn_model import MusicMoodCNN, extract_mel_spectrogram
-from codebase.predict import predict_track
+from codebase.catalogue_page import COLORS
+from codebase.moods import CUTS, GRID, classify_mood
+from codebase.predict import ENSEMBLE, MODEL_TYPES, REG, feature_columns, predict_track
 
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
@@ -32,7 +34,7 @@ class MusicMoodGUI:
         
         self.root = root
         self.root.title("Moodr AI - Music Mood Classifier")
-        self.root.geometry("600x650")
+        self.root.geometry("1200x1350")
 
         # -------------------------------
         # Simple custom grey–purple–white theme
@@ -112,7 +114,7 @@ class MusicMoodGUI:
         # -------------------------------
         # Model selection dropdown
         # -------------------------------
-        self.model_type_var = tk.StringVar(value="logreg")
+        self.model_type_var = tk.StringVar(value="reg")
         model_label = ttk.Label(self.root, text="Select Model Type:")
         model_label.configure(background=root_bg, foreground=light_grey)
         model_label.pack(pady=5)
@@ -120,7 +122,7 @@ class MusicMoodGUI:
         self.model_selector = ttk.Combobox(
             self.root,
             textvariable=self.model_type_var,
-            values=["logreg", "svm", "rf", "cnn"],
+            values=["reg", "ensemble", "logreg", "svm", "rf", "cnn"],
             state="readonly"
         )
         self.model_selector.pack(pady=5)
@@ -152,7 +154,7 @@ class MusicMoodGUI:
         # -------------------------------
         self.output_box = tk.Text(
             self.root,
-            height=10,
+            height=14,
             width=50,
             bg="#3A3A3A",       # dark grey field
             fg=text_white,
@@ -172,12 +174,7 @@ class MusicMoodGUI:
         # Load training feature columns
         # -------------------------------
         try:
-            df_features = pd.read_csv("data/DEAM/features.csv")
-            self.feature_cols = [
-                col for col in df_features.columns
-                if col not in ["song_id", "valence_mean", "arousal_mean",
-                               "valence_label", "arousal_label"]
-            ]
+            self.feature_cols = list(feature_columns())
             print(f"✅ GUI loaded {len(self.feature_cols)} training features")
         except Exception as e:
             messagebox.showerror("Error", f"Could not load feature columns: {e}")
@@ -264,7 +261,7 @@ class MusicMoodGUI:
             with open("prediction_history.csv", "a") as log:
                 log.write(f"{os.path.basename(self.filepath)},{model_type},{valence_prob:.3f},{arousal_prob:.3f}\n")
 
-            self.show_valence_arousal_plot((valence_prob * 2) - 1, (arousal_prob * 2) - 1)
+            self.show_valence_arousal_plot(valence_prob, arousal_prob)
 
         except Exception as e:
             self.progress.stop()
@@ -275,72 +272,47 @@ class MusicMoodGUI:
             messagebox.showwarning("Warning", "Please select a file first.")
             return
 
-        results = []
-        try:
-            # --- Extract shared features ---
-            feats = extract_features(self.filepath)
-            df = pd.DataFrame([feats]).reindex(columns=self.feature_cols, fill_value=0)
+        self.progress["maximum"] = len(MODEL_TYPES) + 1
+        self.progress["value"] = 0
+        self.root.update_idletasks()
 
-            # --- Extract CNN features ---
-            S_val = self.extract_mel_spectrogram(self.filepath)
-            S_val = np.nan_to_num(S_val)
-            S_val = (S_val - S_val.mean()) / (S_val.std() + 1e-6)
-            S_val = torch.tensor(S_val, dtype=torch.float32).unsqueeze(0).unsqueeze(0)
+        scores, failed = {}, []
+        for i, name in enumerate((*MODEL_TYPES, REG), 1):
+            try:
+                r = predict_track(self.filepath, name)
+                scores[name] = (r.valence, r.arousal)
+            except Exception as e:
+                print(f"⚠️ Skipping {name}: {e}")
+                failed.append(name)
+            self.progress["value"] = i
+            self.root.update_idletasks()
 
-            global_feats = extract_audio_stats(self.filepath)
-            global_feats = torch.tensor(global_feats, dtype=torch.float32).unsqueeze(0)
+        # The ensemble is the average of the four classifiers (same definition as predict.py),
+        # so it needs no extra audio processing.
+        if all(m in scores for m in MODEL_TYPES):
+            scores[ENSEMBLE] = (
+                float(np.mean([scores[m][0] for m in MODEL_TYPES])),
+                float(np.mean([scores[m][1] for m in MODEL_TYPES])),
+            )
 
-            device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-            S_val, global_feats = S_val.to(device), global_feats.to(device)
+        order = [REG, ENSEMBLE, *MODEL_TYPES]
+        results = [(n.upper(), *scores[n], classify_mood(*scores[n]))
+                   for n in order if n in scores]
+        if not results:
+            messagebox.showerror("Comparison Error", "No model could classify this file.")
+            return
 
-            # --- Loop through model types ---
-            for model_type in ["logreg", "svm", "rf"]:
-                try:
-                    val_model = pickle.load(open(f"models/{model_type}_valence_model.pkl", "rb"))
-                    val_scaler = pickle.load(open(f"models/{model_type}_valence_scaler.pkl", "rb"))
-                    aro_model = pickle.load(open(f"models/{model_type}_arousal_model.pkl", "rb"))
-                    aro_scaler = pickle.load(open(f"models/{model_type}_arousal_scaler.pkl", "rb"))
+        self.output_box.delete("1.0", tk.END)
+        self.output_box.insert(tk.END, f"File: {os.path.basename(self.filepath)}\n\n")
+        self.output_box.insert(tk.END, f"{'Model':<10}{'Valence':<9}{'Arousal':<9}Mood\n")
+        self.output_box.insert(tk.END, "-" * 42 + "\n")
+        for name, v, a, mood in results:
+            self.output_box.insert(tk.END, f"{name:<10}{v:<9.2f}{a:<9.2f}{mood}\n")
+        self.output_box.insert(tk.END, "\nREG scores are percentiles among DEAM songs;\nthe others are probabilities.\n")
+        if failed:
+            self.output_box.insert(tk.END, f"Skipped: {', '.join(failed)}\n")
 
-                    X_scaled_val = val_scaler.transform(df.values)
-                    valence_prob = val_model.predict_proba(X_scaled_val)[0][1]
-
-                    X_scaled_aro = aro_scaler.transform(df.values)
-                    arousal_prob = aro_model.predict_proba(X_scaled_aro)[0][1]
-
-                    results.append((model_type.upper(), valence_prob, arousal_prob))
-                except Exception as e:
-                    print(f"⚠️ Skipping {model_type}: {e}")
-
-            # --- CNN ---
-            cnn_valence = MusicMoodCNN(num_classes=2)
-            cnn_valence.load_state_dict(torch.load("models/cnn_valence_model.pth", map_location=device))
-            cnn_valence.eval()
-
-            cnn_arousal = MusicMoodCNN(num_classes=2)
-            cnn_arousal.load_state_dict(torch.load("models/cnn_arousal_model.pth", map_location=device))
-            cnn_arousal.eval()
-
-            with torch.no_grad():
-                v_logits = cnn_valence(S_val, global_feats)
-                a_logits = cnn_arousal(S_val, global_feats)
-                v_prob = torch.softmax(v_logits, dim=1)[0, 1].item()
-                a_prob = torch.softmax(a_logits, dim=1)[0, 1].item()
-
-            results.append(("CNN", v_prob, a_prob))
-
-            # --- Display results in GUI ---
-            self.output_box.delete("1.0", tk.END)
-            self.output_box.insert(tk.END, f"File: {os.path.basename(self.filepath)}\n\n")
-            self.output_box.insert(tk.END, f"{'Model':<10}{'Valence':<10}{'Arousal':<10}\n")
-            self.output_box.insert(tk.END, "-" * 35 + "\n")
-            for name, v, a in results:
-                self.output_box.insert(tk.END, f"{name:<10}{v:.2f}{' ' * 6}{a:.2f}\n")
-
-            # --- Optional: Plot comparison ---
-            self.show_model_comparison_plot(results)
-
-        except Exception as e:
-            messagebox.showerror("Comparison Error", f"Could not compare models: {e}")
+        self.show_model_comparison_plot(results)
 
     def show_model_comparison_plot(self, results):
         if self.canvas:
@@ -350,7 +322,7 @@ class MusicMoodGUI:
         valences = [r[1] for r in results]
         arousals = [r[2] for r in results]
 
-        fig, ax = plt.subplots(figsize=(5, 4))
+        fig, ax = plt.subplots(figsize=(5.5, 3.6))
         x = np.arange(len(models))
         width = 0.35
 
@@ -358,11 +330,12 @@ class MusicMoodGUI:
         ax.bar(x + width/2, arousals, width, label="Arousal", color="#56AC8A")
 
         ax.set_xticks(x)
-        ax.set_xticklabels(models)
+        ax.set_xticklabels(models, fontsize=8)
         ax.set_ylim(0, 1)
-        ax.set_ylabel("Predicted Probability")
+        ax.set_ylabel("Score (0 to 1)")
         ax.set_title("Model Comparison: Valence vs Arousal")
-        ax.legend()
+        ax.legend(fontsize=8)
+        fig.tight_layout()
 
         self.figure = fig
         self.canvas = FigureCanvasTkAgg(fig, master=self.root)
@@ -375,41 +348,37 @@ class MusicMoodGUI:
     # Visualization
     # ------------------------------------------------------
     def show_valence_arousal_plot(self, valence, arousal):
-        """Display valence–arousal quadrant plot inside Tkinter."""
-        # Remove old plot if it exists
+        """Plot a song on the nine-mood map. Both axes run from 0 to 1."""
         if self.canvas:
             self.canvas.get_tk_widget().destroy()
 
         fig, ax = plt.subplots(figsize=(4, 4))
-        ax.set_xlim(-1, 1)
-        ax.set_ylim(-1, 1)
+        edges = [0.0, *CUTS, 1.0]            # 0, 1/3, 2/3, 1
+        bands = ["low", "mid", "high"]
+        for i, v_band in enumerate(bands):       # columns: valence, darker to brighter
+            for j, a_band in enumerate(bands):   # rows: arousal, calmer to more energetic
+                mood = GRID[(a_band, v_band)]
+                ax.fill_between([edges[i], edges[i + 1]], edges[j], edges[j + 1],
+                                color=COLORS.get(mood, "gray"), alpha=0.28, linewidth=0)
+                ax.text((edges[i] + edges[i + 1]) / 2, (edges[j] + edges[j + 1]) / 2,
+                        mood, ha="center", va="center", fontsize=9, weight="bold")
+        for cut in CUTS:
+            ax.axvline(cut, color="black", linewidth=0.8)
+            ax.axhline(cut, color="black", linewidth=0.8)
 
-        # Quadrant background colors
-        ax.axhline(0, color='black', linewidth=1)
-        ax.axvline(0, color='black', linewidth=1)
+        ax.scatter(valence, arousal, color="black", s=80, zorder=5)
+        ax.annotate("this song", (valence, arousal), textcoords="offset points",
+                    xytext=(6, 6), fontsize=8, weight="bold")
 
-        ax.fill_betweenx([0, 1], 0, 1, color='lightgreen', alpha=0.3)   # Q1 - Happy/Energetic
-        ax.text(0.5, 0.7, "Happy / Energetic", color="green", fontsize=10, ha="center", weight="bold")
+        ax.set_xlim(0, 1)
+        ax.set_ylim(0, 1)
+        ax.set_xticks(edges, labels=["0", "⅓", "⅔", "1"])
+        ax.set_yticks(edges, labels=["0", "⅓", "⅔", "1"])
+        ax.set_xlabel("Valence (darker → brighter)")
+        ax.set_ylabel("Arousal (calmer → more energetic)")
+        ax.set_title("Mood map")
+        fig.tight_layout()
 
-        ax.fill_betweenx([0, 1], -1, 0, color='lightcoral', alpha=0.3)  # Q2 - Angry/Tense
-        ax.text(-0.5, 0.7, "Angry / Tense", color="red", fontsize=10, ha="center", weight="bold")
-
-        ax.fill_betweenx([-1, 0], -1, 0, color='lightblue', alpha=0.3)  # Q3 - Sad/Depressed
-        ax.text(-0.5, -0.7, "Sad / Depressed", color="blue", fontsize=10, ha="center", weight="bold")
-
-        ax.fill_betweenx([-1, 0], 0, 1, color='khaki', alpha=0.3)       # Q4 - Calm/Relaxed
-        ax.text(0.5, -0.7, "Calm / Relaxed", color="goldenrod", fontsize=10, ha="center", weight="bold")
-
-        # Plot the predicted point
-        ax.scatter(valence, arousal, color='black', s=80, zorder=5)
-        ax.text(valence + 0.05, arousal + 0.05, "Prediction", fontsize=9, weight='bold')
-
-        # Labels
-        ax.set_xlabel("Valence (Low → High)")
-        ax.set_ylabel("Arousal (Low → High)")
-        ax.set_title("Valence–Arousal Mood Space")
-
-        # Embed plot in Tkinter
         self.figure = fig
         self.canvas = FigureCanvasTkAgg(fig, master=self.root)
         self.canvas.draw()
