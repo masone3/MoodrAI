@@ -13,14 +13,14 @@ from codebase.features import extract_features
 from codebase.features_extra import extract_audio_stats
 
 
-def test_extract_features_valid_file():
-    feats = extract_features("data/DEAM/audio/1001.mp3")
+def test_extract_features_valid_file(sample_audio):
+    feats = extract_features(sample_audio)
     assert isinstance(feats, dict)
     assert "centroid" in feats
 
 
-def test_extract_audio_stats_returns_array():
-    arr = extract_audio_stats("data/DEAM/audio/1001.mp3")
+def test_extract_audio_stats_returns_array(sample_audio):
+    arr = extract_audio_stats(sample_audio)
     assert isinstance(arr, np.ndarray)
     assert arr.shape == (4,)  # expected 4 stats
 

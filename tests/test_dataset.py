@@ -11,9 +11,9 @@ sys.path.append(parent)
 from codebase.cnn_model import SpectrogramDataset
 
 
-def test_spectrogram_dataset_item():
+def test_spectrogram_dataset_item(sample_audio):
     # Create dataset with a single sample (path, label)
-    file_label_pairs = [("data/DEAM/audio/1001.mp3", 1)]
+    file_label_pairs = [(sample_audio, 1)]
     ds = SpectrogramDataset(file_label_pairs)
 
     S, global_feats, label = ds[0]
@@ -31,8 +31,8 @@ def test_spectrogram_dataset_item():
     assert label in (0, 1)
 
 
-def test_spectrogram_dataset_normalization():
-    file_label_pairs = [("data/DEAM/audio/1001.mp3", 1)]
+def test_spectrogram_dataset_normalization(sample_audio):
+    file_label_pairs = [(sample_audio, 1)]
     ds = SpectrogramDataset(file_label_pairs, normalize=True)
 
     S, _, _ = ds[0]

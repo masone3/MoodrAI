@@ -1,6 +1,7 @@
 import pytest
 import numpy as np
 import soundfile as sf
+from pathlib import Path
 
 # -------------------------------------------------------
 # 0.5-second sine wave
@@ -60,3 +61,23 @@ def tiny_audio_file(tmp_path):
     file = tmp_path / "tiny.wav"
     sf.write(file, y, sr)
     return str(file)
+
+@pytest.fixture(scope="session")
+def sample_audio(tmp_path_factory):
+    """A 30-second synthetic clip, so tests need no dataset or audio files."""
+    sr = 22050
+    t = np.linspace(0, 30, 30 * sr, endpoint=False)
+    y = 0.4 * np.sin(2 * np.pi * 220 * t) + 0.3 * np.sin(2 * np.pi * 330 * t) * (t > 15)
+    y += 0.02 * np.random.default_rng(0).standard_normal(t.size)
+    path = tmp_path_factory.mktemp("audio") / "sample.wav"
+    sf.write(path, y.astype(np.float32), sr)
+    return str(path)
+
+
+@pytest.fixture
+def deam_dir():
+    """For tests of the training code only. Skips cleanly when the dataset isn't downloaded."""
+    path = Path(__file__).resolve().parent.parent / "data" / "DEAM"
+    if not (path / "features.csv").exists():
+        pytest.skip("DEAM dataset not downloaded (only needed for training)")
+    return path
