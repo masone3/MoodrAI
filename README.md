@@ -55,6 +55,8 @@ You can pin any song to a mood you choose. Pinned moods always win over the mode
 
 Developed on macOS with Python 3.14. The GUI needs Tk (`brew install python-tk@3.14` with Homebrew Python).
 
+Use python3.14 -m venv .venv if running locally.
+
 ```bash
 git clone <this repo> moodrai && cd moodrai
 python3 -m venv .venv && source .venv/bin/activate
