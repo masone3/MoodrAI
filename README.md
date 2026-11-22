@@ -53,16 +53,16 @@ You can pin any song to a mood you choose. Pinned moods always win over the mode
 
 ## Quick start
 
-Developed on macOS with Python 3.14. The GUI needs Tk (`brew install python-tk@3.14` with Homebrew Python).
-
-Use python3.14 -m venv .venv if running locally.
+Requires **Python 3.14**: the pinned versions in `requirements.txt` don't install on older Pythons (we hit this on 3.9). Developed on macOS. The GUI needs Tk (`brew install python-tk@3.14` with Homebrew Python). The trained models are included, so there is **nothing to train and no dataset to download**.
 
 ```bash
-git clone <this repo> moodrai && cd moodrai
-python3 -m venv .venv && source .venv/bin/activate
-python3 -m pip install -r requirements.txt
-python3 -m pytest tests -q
+git clone --depth 1 https://github.com/masone3/MoodrAI.git moodrai && cd moodrai
+python3.14 -m venv .venv && source .venv/bin/activate
+python -m pip install -r requirements.txt
+python -m pytest tests -q
 ```
+
+`--depth 1` skips the project history, which keeps the download small.
 
 ### Classify a folder (no Spotify needed)
 
@@ -97,7 +97,18 @@ python3 -W ignore sync_playlists.py   # moves the song to the right playlist
 
 ### Desktop GUI
 
-`python3 gui.py` classifies a single file with any model and plots it on the valence–arousal plane.
+`python3 gui.py` classifies a single file with any model and plots it on the nine-mood map.
+
+
+### Training from scratch (optional)
+
+Not needed to use Moodr: the trained models are in `models/`. To retrain, download the DEAM dataset from its official page and place it under `data/DEAM/` (this repo does not include it), then run:
+
+```bash
+python3 -W ignore main.py --model_type all    # classifiers and CNN (the CNN is slow)
+python3 -W ignore build_harmony_features.py
+python3 -W ignore train_regression.py
+```
 
 ---
 
@@ -110,7 +121,7 @@ python3 -W ignore sync_playlists.py   # moves the song to the right playlist
 
 **Energy is predicted reasonably well; positivity is not.** On my test songs, every model's valence score tracked its arousal score almost one-for-one (correlation 0.84–0.97, against 0.58 in DEAM's own labels), so loud songs were called "happy." Heavy rock, a genre DEAM covers thinly, is the clearest failure. The sample is small and has a single rater, so treat these as indicative, not conclusive. That is why corrected moods are first-class: where the model is wrong, your ears win.
 
-Processing speed: [fill in from `time python3 -W ignore build_catalogue.py` on your machine].
+Processing speed: 0.2 s per song
 
 ---
 
@@ -156,26 +167,23 @@ Moodr AI aims to provide an accessible bridge between music and emotion. The MVP
 
 ## Prerequisites
 
-To run Moodr AI, you will need:
-
-- **Python 3.10+** (tested up through 3.12)
-- An IDE such as VS Code or PyCharm
-- Required Python libraries:
-  - `librosa` – audio feature extraction
+- **Python 3.14**
+- An IDE such as VS Code or PyCharm (optional)
+- Python libraries, all pinned in `requirements.txt`:
+  - `librosa`, `soundfile` – audio loading and feature extraction
   - `numpy`, `pandas` – feature processing
-  - `matplotlib` – visualization
-  - `scikit-learn` – Logistic Regression / SVM / Random Forest models
-  - `torch` – CNN architecture and training
-  - `tkinter` – desktop GUI
-  - `tqdm` – progress bars during CNN training
-  - `pytest` – test suite
-  - `pickle` – loading/saving trained models
+  - `scikit-learn` – classifiers and the regression model
+  - `torch` – the CNN
+  - `matplotlib`, `tkinter` – visualization and the desktop GUI
+  - `spotipy`, `python-dotenv`, `requests` – Spotify login and API calls
+  - `tqdm`, `pytest` – progress bars and the test suite
+- A Spotify Premium account and your own Spotify developer app, only if you want playlists
 
 ---
 
 ## Requirements
 
-Moodr AI analyzes a 30-second slice of audio and predicts valence and arousal scores. These values are mapped to a quadrant that represents the emotional tone of the music.
+Moodr AI analyzes a 30-second slice of audio and predicts valence and arousal scores. These values are mapped to one of nine moods.
 
 More details: [requirements link](requirements.md)
 
@@ -192,6 +200,10 @@ The architecture is split into modular components:
 - `data_loader.py` – DEAM dataset parsing and labeling
 - `gui.py` – the Tkinter user interface
 - `main.py` – unified training entry point supporting multiple model types
+- `predict.py` – one entry point that turns an audio file into valence, arousal and a mood
+- `moods.py` – the nine-mood map and its boundaries
+- `catalogue.py`, `catalogue_page.py` – the SQLite catalogue and the browsable page
+- `matching.py`, `spotify_client.py`, `sync.py` – Spotify matching and playlists
 
 More information: [design link](design.md)
 
@@ -206,6 +218,7 @@ Moodr AI includes a full `pytest` suite covering:
 - Spectrogram dataset construction and normalization
 - GUI behavior (model selection, missing file handling)
 - Edge-case handling such as empty audio and invalid paths
+- The mood map, catalogue, Spotify matching and sync logic (the Spotify calls are replaced by test doubles, so no login is needed)
 
 Updated test plan: [test plan link](test.plan.md)
 
@@ -213,13 +226,15 @@ Updated test plan: [test plan link](test.plan.md)
 
 ## Built With
 
+- **Spotify Web API (spotipy)** – track matching and playlists
+- **SQLite** – the song catalogue
 - **Librosa** – Music/audio analysis  
 - **Scikit-learn** – Baseline models (LogReg, SVM, Random Forest)  
 - **PyTorch** – CNN classifier on spectrograms  
 - **Tkinter** – User interface  
 - **Pandas** – Annotation data handling  
 - **NumPy** – Feature computation  
-- **Matplotlib** – Visualization (quadrant plot + training graphs)  
+- **Matplotlib** – Visualization (nine-mood map + training graphs)
 - **tqdm** – Progress bars for CNN training  
 - **WeightedRandomSampler (PyTorch)** – Balanced batch training for imbalanced DEAM labels  
 - **pytest** – Comprehensive unit test suite  
@@ -239,7 +254,7 @@ Easton designed, implemented, tested, and documented all components of Moodr AI.
 
 ## Acknowledgments
 
-- **DEAM Dataset** – Source of labeled valence–arousal data  
+- **DEAM Dataset** (Aljanaki, Yang & Soleymani, 2017, *Developing a benchmark for emotional analysis of music*, PLOS ONE) – source of the labeled valence–arousal data used to train the models 
 - Community documentation from Librosa, Scikit-learn, and PyTorch  
 - Professor Wilborne and peers at Berea College  
 - Berea College for supporting this capstone project  
