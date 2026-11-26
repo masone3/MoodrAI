@@ -2,8 +2,9 @@
 spotify_client.py
 -----------------
 Thin wrapper over the Spotify Web API: login, an HTTP helper that survives
-rate limits, and track search. Plain `requests` is used because the February
-2026 API changes renamed endpoints that some helper libraries still call.
+rate limits, track search, and playlist reading and writing. Plain `requests`
+is used because the February 2026 API changes renamed endpoints that some
+helper libraries still call.
 """
 import os
 import time
@@ -71,7 +72,7 @@ class SpotifyClient:
             offset += 50
 
     def playlist_tracks(self, playlist_id):
-        """Every track in a playlist as {'title', 'artist'} dicts."""
+        """Every track in a playlist as dicts with id, uri, title, artist and url."""
         found, offset = [], 0
         while True:
             resp = self.request("GET", f"/playlists/{playlist_id}/items",
@@ -81,9 +82,12 @@ class SpotifyClient:
             for entry in batch:
                 # February 2026 renamed the nested "track" object to "item"; accept either
                 t = (entry or {}).get("item") or (entry or {}).get("track")
-                if t and t.get("name"):  # skips deleted or local-file entries
-                    found.append({"title": t["name"],
-                                  "artist": ", ".join(a["name"] for a in t.get("artists", []))})
+                if t and t.get("id"):  # skips deleted tracks and local files
+                    found.append({
+                        "id": t["id"], "uri": t.get("uri", ""), "title": t.get("name", ""),
+                        "artist": ", ".join(a["name"] for a in t.get("artists", [])),
+                        "url": t.get("external_urls", {}).get("spotify", ""),
+                    })
             if len(batch) < 50:
                 return found
             offset += 50

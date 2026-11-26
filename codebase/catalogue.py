@@ -156,3 +156,17 @@ def unsynced(conn, include_review=False):
 def mark_synced(conn, track_id, mood):
     conn.execute("UPDATE tracks SET synced_mood = ? WHERE id = ?", (mood, track_id))
     conn.commit()
+
+
+def by_spotify_ids(conn, ids):
+    """{spotify_id: row} for catalogue songs matched to any of these Spotify track ids."""
+    ids = [i for i in dict.fromkeys(ids) if i]
+    found = {}
+    for start in range(0, len(ids), 500):  # SQLite limits how many ? placeholders one query may hold
+        chunk = ids[start:start + 500]
+        marks = ",".join("?" * len(chunk))
+        for row in conn.execute(
+                f"SELECT * FROM tracks WHERE spotify_id IN ({marks}) "
+                "AND match_status IN ('matched', 'review')", chunk):
+            found.setdefault(row["spotify_id"], row)
+    return found
