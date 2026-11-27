@@ -1,0 +1,11 @@
+Training on 1802 songs, 44 features
+
+   axis model   MAE  always-guess-mean MAE    R2 pred range
+valence ridge 0.741                  0.968 0.374    2.3-6.8
+valence   svr 0.741                  0.968 0.365    2.2-7.2
+valence    rf 0.720                  0.968 0.412    2.9-7.2
+arousal ridge 0.806                  1.075 0.378    2.5-6.9
+arousal   svr 0.793                  1.075 0.391    2.2-7.1
+arousal    rf 0.779                  1.075 0.418    3.0-6.6
+
+True score range: valence 1.6-8.4, arousal 1.6-8.1
