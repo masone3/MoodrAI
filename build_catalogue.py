@@ -2,60 +2,49 @@
 Classify and match every NEW song in a folder, then store it in the catalogue.
 Songs already in the catalogue are skipped, so this is safe to rerun as the folder grows.
 
-    python3 -W ignore build_catalogue.py                      # data/testsongs, ensemble model
-    python3 -W ignore build_catalogue.py ~/Music/Metal        # any folder
-    python3 -W ignore build_catalogue.py --no-spotify         # classify only, no login needed
+    python3 -W ignore build_catalogue.py ~/Music/Metal
+    python3 -W ignore build_catalogue.py ~/Music --recursive
+    python3 -W ignore build_catalogue.py ~/Music --no-spotify      # classify only, no login
 """
 import argparse
 import warnings
-from pathlib import Path
 
 warnings.filterwarnings("ignore")
 
-from codebase.catalogue import add_track, has_file, mood_counts, open_db
+from codebase.catalogue import mood_counts, open_db
+from codebase.ingest import ingest, list_audio
 from codebase.matching import match_track
-from codebase.predict import ALL_TYPES, ENSEMBLE, predict_track
-
-AUDIO = {".mp3", ".wav"}
+from codebase.predict import ALL_TYPES, REG, predict_track
 
 
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("folder", nargs="?", default="data/testsongs")
-    ap.add_argument("--model", default=ENSEMBLE, choices=ALL_TYPES)
+    ap.add_argument("--model", default=REG, choices=ALL_TYPES)
     ap.add_argument("--no-spotify", action="store_true")
+    ap.add_argument("--recursive", action="store_true", help="include subfolders")
     args = ap.parse_args()
 
-    client = None
+    match = None
     if not args.no_spotify:
         from codebase.spotify_client import SpotifyClient
         client = SpotifyClient()
+        match = lambda name: match_track(client, name)
+
+    def progress(s):
+        if s["current"]:
+            print(f"[{s['done'] + 1}/{s['total']}] {s['current']}")
 
     conn = open_db()
-    files = sorted(p for p in Path(args.folder).iterdir() if p.suffix.lower() in AUDIO)
-    new = [p for p in files if not has_file(conn, p.name)]
-    print(f"{len(files)} songs in folder, {len(new)} new\n")
+    files = list_audio(args.folder, args.recursive)
+    print(f"{len(files)} audio files found\n")
+    s = ingest(conn, files, lambda path: predict_track(path, args.model), match, progress)
 
-    for n, path in enumerate(new, 1):
-        try:
-            pred = predict_track(str(path), args.model)
-            match = (match_track(client, path.name) if client else
-                     {"status": "no_match", "score": 0.0, "spotify_id": "", "uri": "",
-                      "url": "", "title": "", "artist": ""})
-            add_track(
-                conn, file=path.name, valence=pred.valence, arousal=pred.arousal,
-                model_type=pred.model_type,
-                title=match["title"] or path.stem, artist=match["artist"],
-                spotify_id=match["spotify_id"], spotify_uri=match["uri"],
-                spotify_url=match["url"], match_status=match["status"],
-                match_score=match["score"],
-            )
-            flag = " (borderline)" if pred.borderline else ""
-            print(f"[{n}/{len(new)}] {pred.mood:10s}{flag:13s} {match['status']:9s} {path.name}")
-        except Exception as e:
-            print(f"[{n}/{len(new)}] SKIPPED {path.name}: {e}")
-
-    print("\nCatalogue now holds:", mood_counts(conn))
+    print(f"\nAdded {s['added']}, already in catalogue {s['skipped_existing']}, "
+          f"failed {s['failed']}, not matched to Spotify {s['match_failed']}")
+    for e in s["errors"]:
+        print("  ", e)
+    print("Catalogue now holds:", mood_counts(conn))
 
 
 if __name__ == "__main__":
