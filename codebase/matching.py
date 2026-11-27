@@ -56,7 +56,7 @@ def score(file_toks, artist, title):
 def match_track(client, filename):
     toks = filename_tokens(filename)
     result = {"file": os.path.basename(filename), "status": "no_match", "score": 0.0,
-              "spotify_id": "", "uri": "", "title": "", "artist": "", "url": ""}
+              "spotify_id": "", "uri": "", "title": "", "artist": "", "album": "", "url": ""}
     if not toks:
         return result
 
@@ -73,6 +73,6 @@ def match_track(client, filename):
     result.update(
         status="matched" if best_score >= MATCHED_AT else "review",
         spotify_id=best["id"], uri=best["uri"], title=best["title"],
-        artist=best["artist"], url=best["url"],
+        artist=best["artist"], album=best.get("album", ""), url=best["url"],
     )
     return result
