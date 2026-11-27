@@ -38,6 +38,7 @@ APP_SNIPPET = r"""
 .chip{display:flex;align-items:center;gap:7px;text-transform:capitalize}
 .check{display:flex;align-items:center;gap:6px;font-size:.88rem;color:var(--muted)}
 .check input{flex:none;width:auto;padding:0;margin:0}
+.est-tag{border:1px dashed var(--line);border-radius:999px;padding:1px 8px;font-size:.75rem;color:var(--muted)}
 .drop{border:1.5px dashed var(--line);border-radius:6px;padding:26px 18px;margin-top:12px;
   text-align:center;color:var(--muted);transition:border-color .15s,color .15s}
 .drop.over{border-color:var(--fg);color:var(--fg)}
@@ -251,7 +252,18 @@ const MAX_UPLOAD = __MAX_BYTES__;
     const main = el("div");
     main.append(el("div", "title", it.title), el("div", "artist", it.artist));
     const tags = el("div", "tags");
-    tags.append(el("span", "mark", "no audio on this machine"));
+    if (it.status === "estimated") {
+      const mo = el("span", "mood");
+      mo.append(dot(it.mood), it.mood);
+      let why = "estimated from " + it.n + " songs by this artist";
+      if (it.albums) why += ", " + it.albums + (it.albums === 1 ? " album" : " albums");
+      why += " (" + Math.round(it.share * 100) + "% agree)";
+      tags.append(mo, el("span", "est-tag", why));
+    } else if (it.status === "varied") {
+      tags.append(el("span", "est-tag", "this artist's songs vary too much to estimate"));
+    } else {
+      tags.append(el("span", "mark", "no audio on this machine"));
+    }
     li.append(main, tags, el("span"));
     return li;
   }
@@ -284,8 +296,15 @@ const MAX_UPLOAD = __MAX_BYTES__;
         c.append(dot(m), m + " " + n);
         chips.append(c);
       });
-      status.textContent = r.classified + " of " + r.total + " tracks are in your catalogue. " +
-        (r.total - r.classified) + " have no audio file on this machine, so they can't be classified.";
+      Object.entries(r.estimated_counts).forEach(([m, n]) => {
+        const c = el("span", "chip est-tag");
+        c.append(dot(m), "~" + m + " " + n);
+        chips.append(c);
+      });
+      const rest = r.total - r.classified - r.estimated;
+      status.textContent = r.classified + " of " + r.total + " tracks classified from your audio, " +
+        r.estimated + " more estimated from artists you've added (dashed), " +
+        rest + " with neither.";
       result.append(...r.items.map(it => it.status === "classified" ? row(it) : plainRow(it)));
     } catch (e) {
       status.textContent = "Could not classify: " + e.message;
