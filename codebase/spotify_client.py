@@ -55,6 +55,7 @@ class SpotifyClient:
                 "title": t["name"],
                 "artist": ", ".join(a["name"] for a in t["artists"]),
                 "url": t.get("external_urls", {}).get("spotify", ""),
+                "album": (t.get("album") or {}).get("name", ""),
             }
             for t in items if t
         ]

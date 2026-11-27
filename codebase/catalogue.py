@@ -30,7 +30,8 @@ CREATE TABLE IF NOT EXISTS tracks (
     model_type    TEXT NOT NULL,
     added_at      TEXT NOT NULL,
     synced_mood   TEXT,
-    mood_override TEXT
+    mood_override TEXT,
+    album         TEXT
 );
 CREATE INDEX IF NOT EXISTS idx_tracks_mood ON tracks(mood);
 CREATE TABLE IF NOT EXISTS playlists (
@@ -48,7 +49,7 @@ def open_db(path=DB_PATH):
     conn.row_factory = sqlite3.Row  # rows can be read by column name
     conn.executescript(SCHEMA)
     cols = {r["name"] for r in conn.execute("PRAGMA table_info(tracks)")}
-    for col in ("synced_mood", "mood_override"):  # upgrade older catalogues in place
+    for col in ("synced_mood", "mood_override", "album"):  # upgrade older catalogues in place
         if col not in cols:
             conn.execute(f"ALTER TABLE tracks ADD COLUMN {col} TEXT")
     conn.commit()
@@ -59,16 +60,16 @@ def has_file(conn, file):
     return conn.execute("SELECT 1 FROM tracks WHERE file = ?", (file,)).fetchone() is not None
 
 
-def add_track(conn, *, file, valence, arousal, model_type, title="", artist="",
+def add_track(conn, *, file, valence, arousal, model_type, title="", artist="", album="",
               spotify_id="", spotify_uri="", spotify_url="",
               match_status="no_match", match_score=0.0, added_at=None):
     """Insert one song. Raises sqlite3.IntegrityError if the file is already in the catalogue."""
     conn.execute(
-        """INSERT INTO tracks (file, title, artist, spotify_id, spotify_uri, spotify_url,
+        """INSERT INTO tracks (file, title, artist, album, spotify_id, spotify_uri, spotify_url,
                                match_status, match_score, valence, arousal, mood, margin,
                                model_type, added_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-        (file, title, artist, spotify_id, spotify_uri, spotify_url,
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+        (file, title, artist, album, spotify_id, spotify_uri, spotify_url,
          match_status, match_score, valence, arousal,
          classify_mood(valence, arousal), mood_margin(valence, arousal),
          model_type, added_at or datetime.now(timezone.utc).isoformat(timespec="seconds")),
@@ -125,10 +126,17 @@ def update_match(conn, file, m):
         """UPDATE tracks SET spotify_id=?, spotify_uri=?, spotify_url=?,
                              match_status=?, match_score=?,
                              title  = CASE WHEN ? != '' THEN ? ELSE title  END,
-                             artist = CASE WHEN ? != '' THEN ? ELSE artist END
+                             artist = CASE WHEN ? != '' THEN ? ELSE artist END,
+                             album  = CASE WHEN ? != '' THEN ? ELSE album  END
            WHERE file = ?""",
         (m["spotify_id"], m["uri"], m["url"], m["status"], m["score"],
-         m["title"], m["title"], m["artist"], m["artist"], file))
+         m["title"], m["title"], m["artist"], m["artist"],
+         m.get("album", ""), m.get("album", ""), file))
+    conn.commit()
+
+
+def set_album(conn, file, album):
+    conn.execute("UPDATE tracks SET album = ? WHERE file = ?", (album, file))
     conn.commit()
 
 

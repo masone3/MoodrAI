@@ -53,6 +53,7 @@ def ingest(conn, files, predict, match=None, on_progress=None, should_stop=None)
                     summary["match_failed"] += 1
             add_track(conn, file=p.name, valence=pred.valence, arousal=pred.arousal,
                       model_type=pred.model_type, title=m["title"] or p.stem, artist=m["artist"],
+                      album=m.get("album", ""),
                       spotify_id=m["spotify_id"], spotify_uri=m["uri"], spotify_url=m["url"],
                       match_status=m["status"], match_score=m["score"])
             summary["added"] += 1
